@@ -32,7 +32,7 @@ if __name__ == "__main__":
         "-e",
         choices=supported_extensions,
         help="output format for images. for decode only, use '.j2c'",
-        default=".j2c",
+        default=".png",
     )
     parser.add_argument(
         "--force",
