@@ -1,0 +1,4 @@
+Pillow~=10.1
+types-Pillow~=10.1
+tqdm~=4.66
+types-tqdm~=4.66
