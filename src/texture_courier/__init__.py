@@ -12,7 +12,7 @@ from .cache import (
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog="texture_courier",
+        prog="texture-courier",
         description="rips texture cache from second life viewers",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )

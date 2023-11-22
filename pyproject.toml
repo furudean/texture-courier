@@ -1,5 +1,5 @@
 [project]
-name = "texture_courier"
+name = "texture-courier"
 version = "0.0.3"
 authors = [
   { name="Merilynn Bandy", email="hello@furudean.com" },
