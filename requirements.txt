@@ -1,4 +1,0 @@
-mypy~=1.4.1
-types-setuptools~=68.2
-wheel~=0.41.3
-twine~=4.0.2

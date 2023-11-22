@@ -12,6 +12,12 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
+dependencies = [
+  "mypy~=1.4.1",
+  "types-setuptools~=68.2",
+  "wheel~=0.41.3",
+  "twine~=4.0.2"
+]
 
 [project.urls]
 Homepage = "https://github.com/furudean/texture-courier"
