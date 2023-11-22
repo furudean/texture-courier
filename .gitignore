@@ -1,4 +1,8 @@
 .vscode/
-/out/
+/dist/
+/build/
 __pycache__
 .DS_Store
+*.egg-info/
+
+/texturecache/
