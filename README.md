@@ -1,6 +1,6 @@
 # texture-courier
 
-program that rips texture cache from second life viewers
+program / api that rips texture cache from second life viewers
 
 ## goals
 
