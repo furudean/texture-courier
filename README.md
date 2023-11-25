@@ -4,15 +4,16 @@ program that rips texture cache from second life viewers
 
 ## goals
 
-- work on all platforms (that support python)
-- output the cache exactly as it is
-- be as fast as it is practical
-- no dependencies
+- output the entire texture cache in a commonly readable format
+- support all platforms that support python
+- be as fast as it is practical to be
+- use few dependencies
 
 ## non goals
 
-texture-courier should not transform the cache in any way. we output things as
-they are. that means no gui, and no bells and whistles.
+- no gui, and no bells and whistles
+- no option to transform outputs into other formats (this is what graphicsmagick 
+or similar is for)
 
 ## install & use
 
@@ -28,10 +29,15 @@ locate your texture cache, and provide it like so
 texture-courier /Users/meri/Library/Caches/Firestorm_x64/texturecache
 ```
 
-this dumps the contents of the cache folder to a folder (default
+this dumps the contents of the cache to a directory (by default, to  
 `./texturecache`).
 
-use `texture-courier -h` for other options.
+see `texture-courier --help` for other options.
+
+## hacking
+
+i use `pip install --editable .` to install texture-courier as an editable
+package, which allows it to be used like it was installed from pip.
 
 ## prior art
 
