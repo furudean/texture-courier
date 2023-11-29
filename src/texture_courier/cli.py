@@ -1,10 +1,17 @@
 import argparse
 from io import BytesIO
 from pathlib import Path
-import os
 from PIL import Image, UnidentifiedImageError
 
-from .api import TextureCache
+
+from .api import TextureCache, TextureError
+
+
+def is_dir_dirty(path: Path) -> bool:
+    try:
+        return any(path.iterdir())
+    except FileNotFoundError:
+        return False
 
 
 def main() -> None:
@@ -24,14 +31,6 @@ def main() -> None:
     )
 
     parser.add_argument(
-        "--dry-run",
-        "-d",
-        action="store_true",
-        help="don't write anything to disk",
-        default=False,
-    )
-
-    parser.add_argument(
         "--force",
         "-f",
         action="store_true",
@@ -40,57 +39,78 @@ def main() -> None:
     )
 
     parser.add_argument(
-        "-v", action="store_true", help="more detailed output", default=False
+        "--raw",
+        action="store_true",
+        help="skip decoding and just save the raw codestream",
+        default=False,
     )
+
+    # parser.add_argument(
+    #     "-v", action="store_true", help="more detailed output", default=False
+    # )
 
     args = parser.parse_args()
 
-    if (
-        args.force is True
-        or args.dry_run is False
-        or (args.out_dir.exists() and any(args.out_dir.iterdir()))
-    ):
-        print(f"output directory {args.out_dir} already exists")
+    if is_dir_dirty(args.out_dir) and not args.force:
+        print(
+            f"error: output directory {args.out_dir} is dirty (use --force to overwrite)"
+        )
         exit(1)
     else:
         args.out_dir.mkdir(exist_ok=True)
 
     good_writes = 0
-    bad_writes = 0
 
     cache = TextureCache(args.cache_dir)
 
-    for entry in cache:
-        uuid = entry.entry["uuid"]
+    print(cache.header)
+    print("")
 
-        if entry.ok is False:
+    for texture in cache:
+        uuid = texture.entry["uuid"]
+
+        if texture.error == TextureError.EMPTY:
             continue
 
-        image_bytes = BytesIO(entry.loads())
+        image_bytes = texture.loads()
 
-        try:
-            if args.dry_run:
-                save_path: Path = Path(os.devnull)
-            else:
-                save_path = args.out_dir / f"{uuid}.jp2"
+        if args.raw is False:
+            try:
+                save_path: Path = args.out_dir / f"{uuid}.jp2"
+                # the cache stores files in a raw codestream format that is hard for
+                # most operating systems to read, and isn't intended to be used for
+                # storage. loading it with pillow and saving it seems to produce a
+                # correct image. it is slow, however.
+                with Image.open(BytesIO(image_bytes), formats=["jpeg2000"]) as im:
+                    im.save(save_path)
+            except OSError:
+                texture.error = TextureError.WRITE_ERROR
+                continue
+        else:
+            save_path = args.out_dir / f"{uuid}.j2c"
 
-            # the cache stores files in a raw codestream format that is hard for
-            # most operating systems to read, and isn't intended to be used for
-            # storage. loading it with pillow and saving it seems to produce a
-            # correct image. it is slow, however.
-            with Image.open(image_bytes, formats=["jpeg2000"]) as im:
-                im.save(save_path)
+            save_path.write_bytes(image_bytes)
 
-            print(save_path.resolve())
-            good_writes += 1
-        except (UnidentifiedImageError, OSError):
-            bad_writes += 1
-            continue
+        print(save_path.resolve())
+        good_writes += 1
+
+    error_write_textures = [
+        texture for texture in cache if texture.error == TextureError.WRITE_ERROR
+    ]
+    empty_textures = [
+        texture for texture in cache if texture.error == TextureError.EMPTY
+    ]
 
     # if args.v:
     print("")
-    print(f"wrote {good_writes} cache entries")
-    print(f"failed to save {bad_writes} entries") if bad_writes else None
+    print(f"wrote {good_writes} textures")
+    print(
+        f"failed to write {len(error_write_textures)} textures"
+    ) if error_write_textures else None
+    print(f"skipped {len(empty_textures)} empty textures") if empty_textures else None
+
+    # print([texture.entry for texture in error_write_textures])
 
     if not good_writes:
+        print("error: nothing was extracted successfully")
         exit(1)

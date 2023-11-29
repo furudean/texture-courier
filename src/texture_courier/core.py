@@ -28,11 +28,6 @@ class Entry(TypedDict):
     time: datetime
 
 
-def loads_bytes(p: Path) -> BytesIO:
-    with open(p, mode="rb") as f:
-        return BytesIO(f.read())
-
-
 def decode_header(texture_entries: BytesIO) -> Header:
     texture_entries.seek(0)
     header = texture_entries.read(HEADER_BYTE_COUNT)
@@ -67,11 +62,14 @@ def decode_entries(texture_entries: BytesIO, entry_count: int) -> list[Entry]:
     for _ in range(entry_count):
         entry_bytes = texture_entries.read(ENTRY_BYTE_COUNT)
 
+        if entry_bytes == b"":
+            continue
+
         entries.append(decode_entry(entry_bytes))
 
     if len(entries) != entry_count:
-        print(
-            f"number of read entries {len(entries)} does not match expected count {entry_count}"
+        raise Exception(
+            f"number of read entries {len(entries)} does not match count {entry_count} declared in header"
         )
 
     return entries
