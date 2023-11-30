@@ -28,8 +28,7 @@ class Texture:
         self.loads = read
 
         if entry["image_size"] <= 0:
-            # a lot of cache entries are empty, (usually indicated by
-            # image_size = -1)
+            # cache entries can be empty, usually indicated by image_size = -1
             self.error = TextureError.EMPTY
 
     def __repr__(self):

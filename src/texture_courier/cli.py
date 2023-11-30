@@ -51,20 +51,15 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    if is_dir_dirty(args.out_dir) and not args.force:
-        print(
-            f"error: output directory {args.out_dir} is dirty (use --force to overwrite)"
-        )
-        exit(1)
-    else:
-        args.out_dir.mkdir(exist_ok=True)
-
+    existing_textures = 0
     good_writes = 0
 
     cache = TextureCache(args.cache_dir)
 
     print(cache.header)
     print("")
+
+    args.out_dir.mkdir(exist_ok=True)
 
     for texture in cache:
         uuid = texture.entry["uuid"]
@@ -75,8 +70,13 @@ def main() -> None:
         image_bytes = texture.loads()
 
         if args.raw is False:
+            save_path: Path = args.out_dir / f"{uuid}.jp2"
+
+            if save_path.exists() and not args.force:
+                existing_textures += 1
+                continue
+
             try:
-                save_path: Path = args.out_dir / f"{uuid}.jp2"
                 # the cache stores files in a raw codestream format that is hard for
                 # most operating systems to read, and isn't intended to be used for
                 # storage. loading it with pillow and saving it seems to produce a
@@ -101,12 +101,14 @@ def main() -> None:
         texture for texture in cache if texture.error == TextureError.EMPTY
     ]
 
-    # if args.v:
     print("")
     print(f"wrote {good_writes} textures")
     print(
         f"failed to write {len(error_write_textures)} textures"
     ) if error_write_textures else None
+    print(
+        f"skipped {existing_textures} existing textures"
+    ) if existing_textures else None
     print(f"skipped {len(empty_textures)} empty textures") if empty_textures else None
 
     # print([texture.entry for texture in error_write_textures])
