@@ -28,7 +28,7 @@ class Entry(TypedDict):
     time: datetime
 
 
-def decode_header(texture_entries: BytesIO) -> Header:
+def decode_texture_entries_header(texture_entries: BytesIO) -> Header:
     texture_entries.seek(0)
     header = texture_entries.read(HEADER_BYTE_COUNT)
     unpacked = struct.unpack(HEADER_STRUCT_FORMAT, header)
@@ -41,7 +41,7 @@ def decode_header(texture_entries: BytesIO) -> Header:
     }
 
 
-def decode_entry(b: bytes) -> Entry:
+def decode_texture_entry(b: bytes) -> Entry:
     unpack = struct.unpack(ENTRY_STRUCT_FORMAT, b)
 
     uuid = str(UUID(int=int.from_bytes(unpack[0:16], byteorder="big")))
@@ -55,7 +55,7 @@ def decode_entry(b: bytes) -> Entry:
     }
 
 
-def decode_entries(texture_entries: BytesIO, entry_count: int) -> list[Entry]:
+def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[Entry]:
     texture_entries.seek(HEADER_BYTE_COUNT)
     entries = []
 
@@ -65,11 +65,11 @@ def decode_entries(texture_entries: BytesIO, entry_count: int) -> list[Entry]:
         if entry_bytes == b"":
             continue
 
-        entries.append(decode_entry(entry_bytes))
+        entries.append(decode_texture_entry(entry_bytes))
 
     if len(entries) != entry_count:
         raise Exception(
-            f"number of read entries {len(entries)} does not match count {entry_count} declared in header"
+            f"number of read entries {len(entries)} does not match declared count {entry_count}"
         )
 
     return entries

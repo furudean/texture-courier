@@ -1,28 +1,19 @@
 [project]
 name = "texture-courier"
 version = "0.0.4"
-authors = [
-  { name="Merilynn Bandy", email="hello@furudean.com" },
-]
+authors = [{ name = "Merilynn Bandy", email = "hello@furudean.com" }]
 description = "rips texture cache from second life viewers"
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
 ]
-dependencies = [
-  "Pillow~=10.1"
-]
+dependencies = ["Pillow~=10.1", "tqdm~=4.66.1"]
 
-[project.optional-dependencies] 
-dev = [
-  "mypy~=1.4.1",
-  "wheel~=0.41.3",
-  "types-setuptools~=68.2",
-  "build~=1.0.3"
-]
+[project.optional-dependencies]
+dev = ["mypy~=1.4.1", "wheel~=0.41.3", "types-setuptools~=68.2", "build~=1.0.3"]
 
 [project.urls]
 Homepage = "https://github.com/furudean/texture-courier"

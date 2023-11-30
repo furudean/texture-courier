@@ -1,8 +1,8 @@
 import argparse
 from io import BytesIO
 from pathlib import Path
-from PIL import Image, UnidentifiedImageError
-
+from PIL import Image
+from tqdm import tqdm
 
 from .api import TextureCache, TextureError
 
@@ -23,7 +23,7 @@ def main() -> None:
 
     parser.add_argument("cache_dir", type=Path, help="path to texture cache directory")
     parser.add_argument(
-        "--out-dir",
+        "--output-dir",
         "-o",
         type=Path,
         help="path to output assets",
@@ -45,9 +45,13 @@ def main() -> None:
         default=False,
     )
 
-    # parser.add_argument(
-    #     "-v", action="store_true", help="more detailed output", default=False
-    # )
+    parser.add_argument(
+        "--output-mode",
+        "-O",
+        choices=("progress", "files", "debug"),
+        help="specify output",
+        default="progress",
+    )
 
     args = parser.parse_args()
 
@@ -56,12 +60,21 @@ def main() -> None:
 
     cache = TextureCache(args.cache_dir)
 
-    print(cache.header)
-    print("")
+    if args.output_mode == "debug":
+        print("HEADER:")
 
-    args.out_dir.mkdir(exist_ok=True)
+        for k, v in cache.header.items():
+            print(f"{k}: {v}")
 
-    for texture in cache:
+    args.output_dir.mkdir(exist_ok=True)
+
+    for texture in tqdm(
+        cache,
+        total=cache.header["entry_count"],
+        unit="tex",
+        delay=1,
+        disable=args.output_mode != "progress",
+    ):
         uuid = texture.entry["uuid"]
 
         if texture.error == TextureError.EMPTY:
@@ -70,7 +83,7 @@ def main() -> None:
         image_bytes = texture.loads()
 
         if args.raw is False:
-            save_path: Path = args.out_dir / f"{uuid}.jp2"
+            save_path: Path = args.output_dir / f"{uuid}.jp2"
 
             if save_path.exists() and not args.force:
                 existing_textures += 1
@@ -87,32 +100,35 @@ def main() -> None:
                 texture.error = TextureError.WRITE_ERROR
                 continue
         else:
-            save_path = args.out_dir / f"{uuid}.j2c"
+            save_path = args.output_dir / f"{uuid}.j2c"
 
             save_path.write_bytes(image_bytes)
 
-        print(save_path.resolve())
+        if args.output_mode == "files":
+            print(save_path.resolve())
+
         good_writes += 1
 
-    error_write_textures = [
-        texture for texture in cache if texture.error == TextureError.WRITE_ERROR
-    ]
-    empty_textures = [
-        texture for texture in cache if texture.error == TextureError.EMPTY
-    ]
+    if args.output_mode in ("progress", "debug"):
+        error_write_textures = [
+            texture for texture in cache if texture.error == TextureError.WRITE_ERROR
+        ]
+        empty_textures = [
+            texture for texture in cache if texture.error == TextureError.EMPTY
+        ]
 
-    print("")
-    print(f"wrote {good_writes} textures")
-    print(
-        f"failed to write {len(error_write_textures)} textures"
-    ) if error_write_textures else None
-    print(
-        f"skipped {existing_textures} existing textures"
-    ) if existing_textures else None
-    print(f"skipped {len(empty_textures)} empty textures") if empty_textures else None
+        print("")
+        print(f"wrote {good_writes} textures")
+        print(
+            f"skipped {existing_textures} existing textures"
+        ) if existing_textures else None
+        print(
+            f"{len(error_write_textures)} failed due to corrupt codestreams"
+        ) if error_write_textures else None
+        print(
+            f"skipped {len(empty_textures)} empty textures"
+        ) if empty_textures else None
 
-    # print([texture.entry for texture in error_write_textures])
-
-    if not good_writes:
-        print("error: nothing was extracted successfully")
+    if args.output_mode == "files" and good_writes == 0:
+        print("error: no textures were written")
         exit(1)

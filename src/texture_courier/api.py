@@ -65,9 +65,9 @@ class TextureCache:
         self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
         self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
 
-        self.header = core.decode_header(self.texture_entries_file)
+        self.header = core.decode_texture_entries_header(self.texture_entries_file)
 
-        entries = core.decode_entries(
+        entries = core.decode_texture_entries(
             self.texture_entries_file, entry_count=self.header["entry_count"]
         )
 
