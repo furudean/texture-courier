@@ -1,6 +1,6 @@
 # texture-courier
 
-program / api that rips texture cache from second life viewers
+simple program / api that rips texture cache from second life viewers
 
 ## goals
 
@@ -11,19 +11,27 @@ program / api that rips texture cache from second life viewers
 
 ## non goals
 
-- no gui, and no bells and whistles
-- no option to transform outputs into other formats (this is what graphicsmagick 
-or similar is for)
+- no gui, no bells and whistles
+- no option to transform outputs into other formats (this is what graphicsmagick
+  or similar is for)
 
 ## install & use
 
-install texture-courier via pip
+install texture-courier with pip
 
 ```
 pip install texture-courier
 ```
 
-locate your texture cache, and provide it like so
+then, run it on the command line like
+
+```
+texture-courier
+```
+
+texture-courier will attempt to find any texture caches on the system
+automatically. if this does not work, find your texture cache and provide it
+like so
 
 ```
 texture-courier /Users/meri/Library/Caches/Firestorm_x64/texturecache
@@ -37,7 +45,7 @@ see `texture-courier --help` for other options.
 ## hacking
 
 i use `pip install --editable .` to install texture-courier as an editable
-package, which allows it to be used like it was installed from pip.
+package, which allows the cli to be used like it was installed from pip.
 
 ## prior art
 

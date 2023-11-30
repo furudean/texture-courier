@@ -5,13 +5,48 @@ from PIL import Image
 from tqdm import tqdm
 
 from .api import TextureCache, TextureError
+from .find import list_texture_cache
 
 
-def is_dir_dirty(path: Path) -> bool:
+def prompt_for_cache_dir() -> Path:
     try:
-        return any(path.iterdir())
+        caches = list_texture_cache()
     except FileNotFoundError:
-        return False
+        print("error: no cache found")
+        print('try specificying a cache directory with "texture-courier <cache_dir>"')
+        exit(1)
+
+    if len(caches) == 1:
+        print(f"using cache at {caches[0].resolve()}")
+        return caches[0]
+
+    print("no cache directory specified, enter path or select from the list below")
+    print("")
+
+    for i, path in enumerate(caches, start=1):
+        print(f"{i}: {path.resolve()}")
+
+    print("")
+
+    while True:
+        selection = input("enter path or selection: ")
+
+        if selection.strip() == "":
+            continue
+
+        if selection in ("q", "quit", "exit", "0"):
+            exit(0)
+
+        if selection.isdigit():
+            s = int(selection)
+
+            if s < 1 or s > len(caches):
+                print("invalid selection")
+                continue
+
+            return caches[s - 1]
+        else:
+            return Path(selection)
 
 
 def main() -> None:
@@ -21,13 +56,23 @@ def main() -> None:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parser.add_argument("cache_dir", type=Path, help="path to texture cache directory")
+    parser.add_argument(
+        "cache_dir", type=Path, nargs="?", help="path to texture cache directory"
+    )
     parser.add_argument(
         "--output-dir",
         "-o",
         type=Path,
-        help="path to output assets",
+        help="path to output extracted textures",
         default="./texturecache",
+    )
+
+    parser.add_argument(
+        "--output-mode",
+        "-O",
+        choices=("progress", "files", "debug"),
+        help="specify output mode. 'progress' shows a progress bar, 'files' prints the path of each file",
+        default="progress",
     )
 
     parser.add_argument(
@@ -45,23 +90,25 @@ def main() -> None:
         default=False,
     )
 
-    parser.add_argument(
-        "--output-mode",
-        "-O",
-        choices=("progress", "files", "debug"),
-        help="specify output",
-        default="progress",
-    )
-
     args = parser.parse_args()
 
     existing_textures = 0
     good_writes = 0
 
-    cache = TextureCache(args.cache_dir)
+    if args.cache_dir:
+        cache_dir = args.cache_dir
+    else:
+        if args.output_mode == "files":
+            print("error: output mode 'files' requires a cache directory")
+            exit(1)
+
+        cache_dir = prompt_for_cache_dir()
+
+    cache = TextureCache(cache_dir)
 
     if args.output_mode == "debug":
-        print("HEADER:")
+        print("")
+        print("TEXTURE ENTRIES HEADER:")
 
         for k, v in cache.header.items():
             print(f"{k}: {v}")
@@ -71,6 +118,7 @@ def main() -> None:
     for texture in tqdm(
         cache,
         total=cache.header["entry_count"],
+        desc="extracting textures",
         unit="tex",
         delay=1,
         disable=args.output_mode != "progress",
@@ -104,7 +152,7 @@ def main() -> None:
 
             save_path.write_bytes(image_bytes)
 
-        if args.output_mode == "files":
+        if args.output_mode in ("files", "debug"):
             print(save_path.resolve())
 
         good_writes += 1
