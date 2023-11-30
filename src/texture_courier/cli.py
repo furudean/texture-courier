@@ -118,12 +118,12 @@ def main() -> None:
         ]
 
         print("")
-        print(f"wrote {good_writes} textures")
+        print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
         print(
             f"skipped {existing_textures} existing textures"
         ) if existing_textures else None
         print(
-            f"{len(error_write_textures)} failed due to corrupt codestreams"
+            f"{len(error_write_textures)} failed to write"
         ) if error_write_textures else None
         print(
             f"skipped {len(empty_textures)} empty textures"
