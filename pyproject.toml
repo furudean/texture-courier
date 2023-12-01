@@ -1,6 +1,6 @@
 [project]
 name = "texture-courier"
-version = "0.0.4"
+version = "0.0.5"
 authors = [{ name = "Merilynn Bandy", email = "hello@furudean.com" }]
 description = "rips texture cache from second life viewers"
 readme = "README.md"
