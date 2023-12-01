@@ -92,7 +92,7 @@ def main() -> None:
     parser.add_argument(
         "--raw",
         action="store_true",
-        help="skip decoding and just save the raw codestream",
+        help="skip encoding and just save the raw codestream",
         default=False,
     )
 
