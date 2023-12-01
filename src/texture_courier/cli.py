@@ -5,7 +5,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from .api import TextureCache, TextureError
-from .find import list_texture_cache
+from .find import find_texturecache, list_texture_cache
 
 
 def prompt_for_cache_dir() -> Path:
@@ -20,7 +20,7 @@ def prompt_for_cache_dir() -> Path:
         print(f"using cache at {caches[0].resolve()}")
         return caches[0]
 
-    print("no cache directory specified, enter path or select from the list below")
+    print("no cache directory specified, enter path or select from the following")
     print("")
 
     for i, path in enumerate(caches, start=1):
@@ -96,7 +96,11 @@ def main() -> None:
     good_writes = 0
 
     if args.cache_dir:
-        cache_dir = args.cache_dir
+        cache_dir = find_texturecache(args.cache_dir)
+
+        if cache_dir is None:
+            print(f"error: no texture cache found at {args.cache_dir.resolve()}")
+            exit(1)
     else:
         if args.output_mode == "files":
             print("error: output mode 'files' requires a cache directory")

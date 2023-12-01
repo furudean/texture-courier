@@ -17,13 +17,16 @@ viewer_dirs = viewer_dirs_posix + viewer_dirs_macos_win
 
 
 def find_texturecache(path: Path) -> Path | None:
+    if not path.exists():
+        return None
+
     # if we find a texture.entries file, we're done
     if path.name == "texturecache" and (path / "texture.entries").exists():
         return path
 
     # otherwise, recurse into the children with some possible names
     for child in path.iterdir():
-        if child.is_dir() and child.name.lower() == "texturecache":
+        if child.is_dir() and child.name == "texturecache":
             return child
 
     return None
