@@ -11,32 +11,20 @@ os_cache_roots = [
 ]
 
 # macos and windows name their viewer directories the same, but posix has different names
-viewer_dirs_posix = (".secondlife", ".firestorm_x64", ".alchemy", ".alchemynext")
-viewer_dirs_macos_win = ("SecondLife", "Firestorm_x64", "Alchemy", "AlchemyNext")
+viewer_dirs_posix = [".firestorm_x64/cache", ".alchemynext/cache"]
+viewer_dirs_macos_win = ["SecondLife", "Firestorm_x64", "AlchemyNext"]
 viewer_dirs = viewer_dirs_posix + viewer_dirs_macos_win
 
-walk_dir_names = ("texturecache", "textures", "cache")
 
-
-def variant_paths(path: Path) -> list[Path]:
-    return [path, Path(f".{str(path).lower()}")]
-
-
-def recursive_find_texturecache(path: Path, max_depth=3) -> Path | None:
-    if max_depth == 0:
-        return None
-
+def find_texturecache(path: Path) -> Path | None:
     # if we find a texture.entries file, we're done
     if path.name == "texturecache" and (path / "texture.entries").exists():
         return path
 
     # otherwise, recurse into the children with some possible names
     for child in path.iterdir():
-        if child.is_dir() and child.name.lower() in walk_dir_names:
-            match = recursive_find_texturecache(child, max_depth - 1)
-
-            if match:
-                return match
+        if child.is_dir() and child.name.lower() == "texturecache":
+            return child
 
     return None
 
@@ -51,8 +39,8 @@ def list_texture_cache() -> list[Path]:
         if Path.joinpath(root, path).exists()
     ]
 
-    # recursively find the texture cache folder
-    texturecaches = [recursive_find_texturecache(path) for path in viewer_caches]
+    # find the texture cache folder
+    texturecaches = [find_texturecache(path) for path in viewer_caches]
 
     # filter out the paths that don't exist
     texturecaches_non_null = [cache for cache in texturecaches if cache is not None]
