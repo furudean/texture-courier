@@ -27,7 +27,7 @@ def find_texturecache(path: Path) -> Path | None:
     # otherwise, recurse into the children with some possible names
     for child in path.iterdir():
         if child.is_dir() and child.name == "texturecache":
-            return child
+            return find_texturecache(child)
 
     return None
 

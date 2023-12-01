@@ -46,7 +46,13 @@ def prompt_for_cache_dir() -> Path:
 
             return caches[s - 1]
         else:
-            return Path(selection)
+            cache = find_texturecache(Path(selection))
+
+            if cache is None:
+                print(f"error: no texture cache found at {selection}")
+                exit(1)
+
+            return cache
 
 
 def main() -> None:
@@ -175,7 +181,7 @@ def main() -> None:
             f"skipped {existing_textures} existing textures"
         ) if existing_textures else None
         print(
-            f"{len(error_write_textures)} failed to write"
+            f"{len(error_write_textures)} invalid textures could not be written"
         ) if error_write_textures else None
         print(
             f"skipped {len(empty_textures)} empty textures"
