@@ -16,9 +16,11 @@ dependencies = ["Pillow~=10.1", "tqdm~=4.66.1"]
 dev = [
   "mypy~=1.7.1",
   "wheel~=0.41.3",
-  "types-setuptools~=68.2",
   "build~=1.0.3",
   "flake8~=6.1.0",
+  "types-setuptools~=68.2",
+  "types-Pillow~=10.1.0.0",
+  "types-tqdm~=4.66.0.3",
 ]
 
 [project.urls]
