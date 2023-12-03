@@ -1,7 +1,7 @@
 from enum import Enum, auto
 from io import BytesIO
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Iterator
 from . import core
 
 
@@ -31,7 +31,7 @@ class Texture:
             # cache entries can be empty, usually indicated by image_size = -1
             self.error = TextureError.EMPTY
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<TextureCacheItem {self.uuid}>"
 
 
@@ -55,13 +55,13 @@ class TextureCache:
 
         self.refresh()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Texture]:
         return iter(self.textures)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<TextureCache {self.cache_dir.resolve()}>"
 
-    def refresh(self):
+    def refresh(self) -> None:
         self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
         self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
 
@@ -73,7 +73,7 @@ class TextureCache:
 
         self.textures = []
 
-        def get_read_bytes(i: int, entry: core.Entry):
+        def get_read_bytes(i: int, entry: core.Entry) -> Callable[[], bytes]:
             def read_bytes() -> bytes:
                 head = core.read_texture_cache(self.texture_cache_file, i)
 
