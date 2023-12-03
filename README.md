@@ -1,4 +1,4 @@
-![Courier from Hello Girl](courier.png)
+![Courier from Hello Girl](https://github.com/furudean/texture-courier/blob/main/courier.png?raw=true)
 
 # texture-courier
 
