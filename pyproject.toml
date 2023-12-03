@@ -15,7 +15,7 @@ dependencies = ["Pillow~=10.1", "tqdm~=4.66.1"]
 [project.optional-dependencies]
 dev = [
   "mypy~=1.7.1",
-  "wheel~=0.41.3",
+  "wheel>=0.41.3,<0.43.0",
   "build~=1.0.3",
   "flake8~=6.1.0",
   "types-setuptools~=68.2",
