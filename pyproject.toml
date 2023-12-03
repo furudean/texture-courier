@@ -18,7 +18,7 @@ dev = [
   "wheel~=0.41.3",
   "build~=1.0.3",
   "flake8~=6.1.0",
-  "types-setuptools~=68.2",
+  "types-setuptools>=68.2,<70.0",
   "types-Pillow~=10.1.0.0",
   "types-tqdm~=4.66.0.3",
 ]
