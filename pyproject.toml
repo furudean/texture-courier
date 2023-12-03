@@ -35,3 +35,4 @@ texture-courier = "texture_courier:main"
 [tool.mypy]
 python_version = "3.11"
 strict = true
+files = ["src"]
