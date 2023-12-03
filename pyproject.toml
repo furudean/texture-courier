@@ -13,7 +13,14 @@ classifiers = [
 dependencies = ["Pillow~=10.1", "tqdm~=4.66.1"]
 
 [project.optional-dependencies]
-dev = ["mypy~=1.4.1", "wheel~=0.41.3", "types-setuptools~=68.2", "build~=1.0.3"]
+dev = [
+  "mypy~=1.4.1",
+  "wheel~=0.41.3",
+  "types-setuptools~=68.2",
+  "build~=1.0.3",
+  "flake8~=6.1.0",
+  "mypy~=1.7.1",
+]
 
 [project.urls]
 Homepage = "https://github.com/furudean/texture-courier"
@@ -25,3 +32,7 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 texture-courier = "texture_courier:main"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
