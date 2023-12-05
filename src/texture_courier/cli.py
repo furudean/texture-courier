@@ -1,7 +1,10 @@
 import argparse
 from pathlib import Path
+import sys
 from typing import Literal
 from tqdm import tqdm
+
+from texture_courier.signal import interrupthandler
 
 from .api import Texture, TextureCache
 from .find import find_texturecache, list_texture_cache
@@ -13,11 +16,7 @@ def prompt_for_cache_dir() -> Path:
     except FileNotFoundError:
         print("error: no cache found")
         print('try specificying a cache directory with "texture-courier <cache_dir>"')
-        exit(1)
-
-    if len(caches) == 1:
-        print(f"using cache at {caches[0].resolve()}")
-        return caches[0]
+        sys.exit(1)
 
     print("no cache directory specified, enter path or select from the following")
     print("")
@@ -27,31 +26,37 @@ def prompt_for_cache_dir() -> Path:
 
     print("")
 
-    while True:
-        selection = input("enter path or selection: ")
+    with interrupthandler() as h:
+        while True:
+            if h.interrupted:
+                break
 
-        if selection.strip() == "":
-            continue
+            selection = input("enter path or selection: ")
 
-        if selection in ("q", "quit", "exit", "0"):
-            exit(0)
-
-        if selection.isdigit():
-            s = int(selection)
-
-            if s < 1 or s > len(caches):
-                print("invalid selection")
+            if selection.strip() == "":
                 continue
 
-            return caches[s - 1]
-        else:
-            cache = find_texturecache(Path(selection))
+            if selection in ("q", "quit", "exit", "0"):
+                sys.exit(0)
 
-            if cache is None:
-                print(f"error: no texture cache found at {selection}")
-                exit(1)
+            if selection.isdigit():
+                s = int(selection)
 
-            return cache
+                if s < 1 or s > len(caches):
+                    print("invalid selection")
+                    continue
+
+                return caches[s - 1]
+            else:
+                cache = find_texturecache(Path(selection))
+
+                if cache is None:
+                    print(f"error: no texture cache found at {selection}")
+                    sys.exit(1)
+
+                return cache
+
+    assert False, "unreachable"
 
 
 class Args(argparse.Namespace):
@@ -117,11 +122,11 @@ def main() -> None:
 
         if cache_dir is None:
             print(f"error: no texture cache found at {args.cache_dir.resolve()}")
-            exit(1)
+            sys.exit(1)
     else:
         if args.output_mode == "files":
             print("error: output mode 'files' requires a cache directory")
-            exit(1)
+            sys.exit(1)
 
         cache_dir = prompt_for_cache_dir()
 
@@ -139,47 +144,52 @@ def main() -> None:
 
     args.output_dir.mkdir(exist_ok=True)
 
-    for texture in tqdm(
-        cache,
-        total=cache.header["entry_count"],
-        desc="extracting textures",
-        unit="tex",
-        delay=1,
-        disable=args.output_mode != "progress",
-    ):
-        if texture.is_empty:
-            continue
+    with interrupthandler() as h:
+        for texture in tqdm(
+            cache,
+            total=cache.header["entry_count"],
+            desc="extracting textures",
+            unit="tex",
+            delay=1,
+            disable=args.output_mode != "progress",
+        ):
+            if h.interrupted:
+                # break the loop if the user presses ctrl+c
+                break
 
-        if args.raw is False:
-            save_path = args.output_dir / f"{texture.uuid}.jp2"
-
-            if save_path.exists() and not args.force:
-                existing_textures += 1
+            if texture.is_empty:
                 continue
 
-            try:
-                # the cache stores textures in a raw jpeg2000 codestream format
-                # that is hard for most operating systems to read, which isn't
-                # intended to be used for storage. loading it with pillow puts
-                # it in a proper container format
-                with texture.open_image() as im:
-                    im.save(save_path)
-            except OSError:
-                error_write_textures.append(texture)
-                continue
-        else:
-            save_path = args.output_dir / f"{texture.uuid}.j2c"
+            if args.raw is False:
+                save_path = args.output_dir / f"{texture.uuid}.jp2"
 
-            if save_path.exists() and not args.force:
-                existing_textures += 1
-                continue
+                if save_path.exists() and not args.force:
+                    existing_textures += 1
+                    continue
 
-            save_path.write_bytes(texture.loads())
+                try:
+                    # the cache stores textures in a raw jpeg2000 codestream format
+                    # that is hard for most operating systems to read, which isn't
+                    # intended to be used for storage. loading it with pillow puts
+                    # it in a proper container format
+                    with texture.open_image() as im:
+                        im.save(save_path)
+                except OSError:
+                    error_write_textures.append(texture)
+                    continue
+            else:
+                save_path = args.output_dir / f"{texture.uuid}.j2c"
 
-        if args.output_mode in ("files", "debug"):
-            print(save_path.resolve())
+                if save_path.exists() and not args.force:
+                    existing_textures += 1
+                    continue
 
-        good_writes += 1
+                save_path.write_bytes(texture.loads())
+
+            if args.output_mode in ("files", "debug"):
+                print(save_path.resolve())
+
+            good_writes += 1
 
     if args.output_mode in ("progress", "debug"):
         empty_textures = [texture for texture in cache if texture.is_empty]
