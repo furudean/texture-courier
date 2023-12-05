@@ -26,4 +26,5 @@ class interrupthandler(ContextDecorator):
             sys.exit(130)
 
     def handler(self, signalnum: int, frame: FrameType | None) -> None:
+        print("\ninterrupt signal received, exiting gracefully...")
         self.interrupted = True

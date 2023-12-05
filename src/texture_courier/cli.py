@@ -191,17 +191,17 @@ def main() -> None:
 
             good_writes += 1
 
-    if args.output_mode in ("progress", "debug"):
-        empty_textures = [texture for texture in cache if texture.is_empty]
+        if args.output_mode in ("progress", "debug"):
+            empty_textures = [texture for texture in cache if texture.is_empty]
 
-        print("")
-        print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
-        print(
-            f"skipped {existing_textures} existing textures"
-        ) if existing_textures else None
-        print(
-            f"{len(error_write_textures)} invalid textures could not be written"
-        ) if error_write_textures else None
-        print(
-            f"skipped {len(empty_textures)} empty textures"
-        ) if empty_textures else None
+            print("")
+            print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
+            print(
+                f"skipped {existing_textures} existing textures"
+            ) if existing_textures else None
+            print(
+                f"{len(error_write_textures)} invalid textures could not be written"
+            ) if error_write_textures else None
+            print(
+                f"skipped {len(empty_textures)} empty textures"
+            ) if empty_textures else None
