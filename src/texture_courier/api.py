@@ -1,38 +1,60 @@
-from enum import Enum, auto
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Callable, Iterator, Optional
+from typing_extensions import TypeVar
+from datetime import datetime
+
 from . import core
+
+from PIL import Image
+
+T = TypeVar("T", default=None)
 
 
 def loads_bytes_io(p: Path) -> BytesIO:
     return BytesIO(p.read_bytes())
 
 
-class TextureError(Enum):
-    EMPTY = auto()
-    WRITE_ERROR = auto()
+def format_bytes(size: float) -> tuple[float, str]:
+    power = 2**10
+    n = 0
+    power_labels = {0: "bytes", 1: "KB", 2: "MB", 3: "GB", 4: "TB"}
+    while size > power:
+        size /= power
+        n += 1
+    return size, power_labels[n]
 
 
 class Texture:
     index: int
+    loads: Callable[[], bytes]
+    """Open texture as a bytes object"""
+
     uuid: str
-    entry: core.Entry
-    loads: Callable[..., bytes]
-    error: TextureError | None = None
+    image_size: int
+    body_size: int
+    time: datetime
 
-    def __init__(self, *, index: int, entry: core.Entry, read: Callable[..., bytes]):
+    def __init__(self, *, index: int, entry: core.Entry, loads: Callable[[], bytes]):
         self.index = index
-        self.uuid = entry["uuid"]
-        self.entry = entry
-        self.loads = read
+        self.loads = loads
 
-        if entry["image_size"] <= 0:
-            # cache entries can be empty, usually indicated by image_size = -1
-            self.error = TextureError.EMPTY
+        for key, value in entry.items():
+            setattr(self, key, value)
 
     def __repr__(self) -> str:
-        return f"<TextureCacheItem {self.uuid}>"
+        size, unit = format_bytes(self.image_size)
+        return f"<Texture {self.uuid}, {self.time}, {int(size)} {unit}>"
+
+    @property
+    def is_empty(self) -> bool:
+        return self.image_size <= 0
+
+    def open_image(self) -> Image.Image:
+        """Open texture as a pillow image"""
+
+        b = self.loads()
+        return Image.open(BytesIO(b), formats=["jpeg2000"])
 
 
 class TextureCache:
@@ -41,7 +63,7 @@ class TextureCache:
     texture_cache_file: BytesIO
 
     header: core.Header
-    textures: list[Texture]
+    textures: dict[str, Texture] = {}
 
     def __init__(self, cache_dir: str | Path):
         self.cache_dir = Path(cache_dir)
@@ -56,10 +78,25 @@ class TextureCache:
         self.refresh()
 
     def __iter__(self) -> Iterator[Texture]:
-        return iter(self.textures)
+        return iter(self.textures.values())
 
     def __repr__(self) -> str:
-        return f"<TextureCache {self.cache_dir.resolve()}>"
+        return f"<TextureCache {self.cache_dir.resolve()}, {self.header['entry_count']} entries>"
+
+    def __get_read_bytes(self, i: int, entry: core.Entry) -> Callable[[], bytes]:
+        def read_bytes() -> bytes:
+            head = core.read_texture_cache(self.texture_cache_file, i)
+
+            if entry["image_size"] <= 601 and entry["body_size"] == 0:
+                # sometimes the file is smaller than 600 bytes, so using the head is
+                # sufficient
+                return head
+            else:
+                body = core.read_texture_body(entry["uuid"], cache_dir=self.cache_dir)
+
+                return head + body
+
+        return read_bytes
 
     def refresh(self) -> None:
         self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
@@ -71,37 +108,13 @@ class TextureCache:
             self.texture_entries_file, entry_count=self.header["entry_count"]
         )
 
-        self.textures = []
-
-        def get_read_bytes(i: int, entry: core.Entry) -> Callable[[], bytes]:
-            def read_bytes() -> bytes:
-                head = core.read_texture_cache(self.texture_cache_file, i)
-
-                if entry["image_size"] <= 601 and entry["body_size"] == 0:
-                    # sometimes the file is smaller than 600 bytes, so using the head is
-                    # sufficient
-                    return head
-                else:
-                    body = core.read_texture_body(
-                        entry["uuid"], cache_dir=self.cache_dir
-                    )
-
-                    return head + body
-
-            return lambda: read_bytes()
-
         for i, entry in enumerate(entries):
-            self.textures.append(
-                Texture(
+            if not entry["uuid"] in self.textures:
+                self.textures[entry["uuid"]] = Texture(
                     index=i,
                     entry=entry,
-                    read=get_read_bytes(i, entry),
+                    loads=self.__get_read_bytes(i, entry),
                 )
-            )
 
-    def get(self, uuid: str) -> Texture | None:
-        for texture in self.textures:
-            if texture.uuid == uuid:
-                return texture
-
-        return None
+    def get(self, uuid: str, default: Optional[T] = None) -> Texture | T:
+        return self.textures.get(uuid, default)  # type: ignore

@@ -1,10 +1,9 @@
 import argparse
-from io import BytesIO
 from pathlib import Path
-from PIL import Image
+from typing import Literal
 from tqdm import tqdm
 
-from .api import TextureCache, TextureError
+from .api import Texture, TextureCache
 from .find import find_texturecache, list_texture_cache
 
 
@@ -55,7 +54,15 @@ def prompt_for_cache_dir() -> Path:
             return cache
 
 
-def main() -> None:
+class Args(argparse.Namespace):
+    cache_dir: Path | None
+    output_dir: Path
+    output_mode: Literal["progress", "files", "debug"]
+    force: bool
+    raw: bool
+
+
+def parse_args() -> Args:
     parser = argparse.ArgumentParser(
         prog="texture-courier",
         description="rips texture cache from second life viewers",
@@ -96,10 +103,14 @@ def main() -> None:
         default=False,
     )
 
-    args = parser.parse_args()
+    args = Args()
+    parser.parse_args(namespace=args)
 
-    existing_textures = 0
-    good_writes = 0
+    return args
+
+
+def main() -> None:
+    args = parse_args()
 
     if args.cache_dir:
         cache_dir = find_texturecache(args.cache_dir)
@@ -115,6 +126,9 @@ def main() -> None:
         cache_dir = prompt_for_cache_dir()
 
     cache = TextureCache(cache_dir)
+    existing_textures = 0
+    good_writes = 0
+    error_write_textures: list[Texture] = []
 
     if args.output_mode == "debug":
         print("")
@@ -133,34 +147,34 @@ def main() -> None:
         delay=1,
         disable=args.output_mode != "progress",
     ):
-        uuid = texture.entry["uuid"]
-
-        if texture.error == TextureError.EMPTY:
+        if texture.is_empty:
             continue
 
-        image_bytes = texture.loads()
-
         if args.raw is False:
-            save_path: Path = args.output_dir / f"{uuid}.jp2"
+            save_path = args.output_dir / f"{texture.uuid}.jp2"
 
             if save_path.exists() and not args.force:
                 existing_textures += 1
                 continue
 
             try:
-                # the cache stores files in a raw codestream format that is hard for
-                # most operating systems to read, and isn't intended to be used for
-                # storage. loading it with pillow and saving it seems to produce a
-                # correct image. it is slow, however.
-                with Image.open(BytesIO(image_bytes), formats=["jpeg2000"]) as im:
+                # the cache stores textures in a raw jpeg2000 codestream format
+                # that is hard for most operating systems to read, which isn't
+                # intended to be used for storage. loading it with pillow puts
+                # it in a proper container format
+                with texture.open_image() as im:
                     im.save(save_path)
             except OSError:
-                texture.error = TextureError.WRITE_ERROR
+                error_write_textures.append(texture)
                 continue
         else:
-            save_path = args.output_dir / f"{uuid}.j2c"
+            save_path = args.output_dir / f"{texture.uuid}.j2c"
 
-            save_path.write_bytes(image_bytes)
+            if save_path.exists() and not args.force:
+                existing_textures += 1
+                continue
+
+            save_path.write_bytes(texture.loads())
 
         if args.output_mode in ("files", "debug"):
             print(save_path.resolve())
@@ -168,12 +182,7 @@ def main() -> None:
         good_writes += 1
 
     if args.output_mode in ("progress", "debug"):
-        error_write_textures = [
-            texture for texture in cache if texture.error == TextureError.WRITE_ERROR
-        ]
-        empty_textures = [
-            texture for texture in cache if texture.error == TextureError.EMPTY
-        ]
+        empty_textures = [texture for texture in cache if texture.is_empty]
 
         print("")
         print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
