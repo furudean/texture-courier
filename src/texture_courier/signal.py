@@ -10,9 +10,11 @@ Handlers: TypeAlias = Callable[[int, FrameType | None], Any] | int | None
 class interrupthandler(ContextDecorator):
     interrupted: bool = False
     original_sigint_handler: Handlers
+    immediate: bool
 
-    def __init__(self) -> None:
+    def __init__(self, *, immediate: bool = False) -> None:
         self.original_sigint_handler: Handlers = signal.getsignal(signal.SIGINT)
+        self.immediate = immediate
 
     def __enter__(self) -> Self:
         signal.signal(signal.SIGINT, self.handler)
@@ -26,5 +28,9 @@ class interrupthandler(ContextDecorator):
             sys.exit(130)
 
     def handler(self, signalnum: int, frame: FrameType | None) -> None:
-        print("\ninterrupt signal received, exiting gracefully...")
         self.interrupted = True
+
+        if self.immediate:
+            self.__exit__()
+
+        print("\ninterrupt signal received, exiting gracefully...")

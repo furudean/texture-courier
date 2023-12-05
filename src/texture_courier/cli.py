@@ -26,11 +26,8 @@ def prompt_for_cache_dir() -> Path:
 
     print("")
 
-    with interrupthandler() as h:
-        while True:
-            if h.interrupted:
-                break
-
+    with interrupthandler(immediate=True) as h:
+        while not h.interrupted:
             selection = input("enter path or selection: ")
 
             if selection.strip() == "":
