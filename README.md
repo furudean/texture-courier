@@ -2,7 +2,7 @@
 
 # texture-courier
 
-simple program / api that rips texture cache from second life viewers
+simple CLI program and API that extracts texture cache from second life viewers
 
 ## goals
 
@@ -14,8 +14,7 @@ simple program / api that rips texture cache from second life viewers
 ## non goals
 
 - no gui, no bells and whistles
-- no option to transform outputs into other formats (this is what graphicsmagick
-  or similar is for)
+- no option to transform outputs into other formats, as i believe this is better covered by other programs
 
 ## install & use
 
