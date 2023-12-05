@@ -195,7 +195,3 @@ def main() -> None:
         print(
             f"skipped {len(empty_textures)} empty textures"
         ) if empty_textures else None
-
-    if args.output_mode == "files" and good_writes == 0:
-        print("error: no textures were written")
-        exit(1)
