@@ -2,7 +2,7 @@
 
 # texture-courier
 
-simple CLI program and API that extracts texture cache from second life viewers
+simple CLI program and python API that extracts texture cache from second life viewers
 
 ## goals
 
