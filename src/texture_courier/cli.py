@@ -4,8 +4,8 @@ import sys
 from typing import Literal
 from tqdm import tqdm
 
-from texture_courier.signal import interrupthandler
 
+from .signal import interrupthandler
 from .api import Texture, TextureCache
 from .find import find_texturecache, list_texture_cache
 
@@ -91,6 +91,14 @@ def parse_args() -> Args:
     )
 
     parser.add_argument(
+        "--watch",
+        "-w",
+        action="store_true",
+        help="watch the cache directory for changes",
+        default=False,
+    )
+
+    parser.add_argument(
         "--force",
         "-f",
         action="store_true",
@@ -140,6 +148,17 @@ def main() -> None:
             print(f"{k}: {v}")
 
     args.output_dir.mkdir(exist_ok=True)
+
+    if args.watch:
+        observer = cache.watch(lambda modified_textures: print(modified_textures))
+
+        try:
+            while observer.is_alive():
+                observer.join(1)
+        finally:
+            observer.stop()
+            observer.join()
+            exit(0)
 
     with interrupthandler() as h:
         for texture in tqdm(

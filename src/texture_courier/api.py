@@ -1,10 +1,17 @@
 from io import BytesIO
 from pathlib import Path
-from typing import Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional
 from typing_extensions import TypeVar
-from datetime import datetime
+from watchdog.observers import Observer
+from watchdog.observers.api import BaseObserver
+from watchdog.events import (
+    PatternMatchingEventHandler,
+    DirModifiedEvent,
+    FileModifiedEvent,
+)
 
 from . import core
+from .util import format_bytes
 
 from PIL import Image
 
@@ -15,42 +22,20 @@ def loads_bytes_io(p: Path) -> BytesIO:
     return BytesIO(p.read_bytes())
 
 
-def format_bytes(size: float) -> str:
-    power = 2**10
-    n = 0
-    power_labels = {0: "bytes", 1: "KB", 2: "MB", 3: "GB", 4: "TB"}
-
-    while size > power:
-        size /= power
-        n += 1
-
-    return f"{int(size)} {power_labels[n]}"
-
-
-class Texture:
+class Texture(core.Entry):
     index: int
     loads: Callable[[], bytes]
     """Open texture as a bytes object"""
 
-    uuid: str
-    image_size: int
-    body_size: int
-    time: datetime
-
     def __init__(self, *, index: int, entry: core.Entry, loads: Callable[[], bytes]):
+        super().__init__(**entry.__dict__)
+
         self.index = index
         self.loads = loads
 
-        for key, value in entry.items():
-            setattr(self, key, value)
-
     def __repr__(self) -> str:
-        size = format_bytes(self.image_size) if self.is_empty else "empty"
+        size = format_bytes(self.image_size) if not self.is_empty else "empty"
         return f"<Texture {self.uuid}, {self.time}, {size}>"
-
-    @property
-    def is_empty(self) -> bool:
-        return self.image_size <= 0
 
     def open_image(self) -> Image.Image:
         """Open texture as a pillow image"""
@@ -65,6 +50,7 @@ class TextureCache:
     texture_cache_file: BytesIO
 
     header: core.Header
+    entries: list[core.Entry] = []
     textures: dict[str, Texture] = {}
 
     def __init__(self, cache_dir: str | Path):
@@ -82,6 +68,9 @@ class TextureCache:
     def __iter__(self) -> Iterator[Texture]:
         return iter(self.textures.values())
 
+    def __len__(self) -> int:
+        return len(self.textures)
+
     def __repr__(self) -> str:
         total_size = sum(texture.image_size for texture in self)
 
@@ -95,34 +84,67 @@ class TextureCache:
         def read_bytes() -> bytes:
             head = core.read_texture_cache(self.texture_cache_file, i)
 
-            if entry["image_size"] <= 601 and entry["body_size"] == 0:
+            if entry.image_size <= 601 and entry.body_size == 0:
                 # sometimes the file is smaller than 600 bytes, so using the head is
                 # sufficient
                 return head
             else:
-                body = core.read_texture_body(entry["uuid"], cache_dir=self.cache_dir)
+                body = core.read_texture_body(entry.uuid, cache_dir=self.cache_dir)
 
                 return head + body
 
         return read_bytes
 
-    def refresh(self) -> None:
-        self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
-        self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
+    def refresh(self) -> list[Texture]:
+        old_entry_count = len(self.textures)
 
+        self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
+        self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.entries")
         self.header = core.decode_texture_entries_header(self.texture_entries_file)
 
-        entries = core.decode_texture_entries(
-            self.texture_entries_file, entry_count=self.header["entry_count"]
+        new_entry_count = self.header["entry_count"]
+
+        self.entries = core.decode_texture_entries(
+            self.texture_entries_file,
+            start=0,
+            stop=new_entry_count,
         )
 
-        for i, entry in enumerate(entries):
-            if not entry["uuid"] in self.textures:
-                self.textures[entry["uuid"]] = Texture(
+        if new_entry_count < old_entry_count:
+            # the cache was cleared
+            self.textures = {}
+
+        changed_textures: dict[str, Texture] = {}
+
+        for i, entry in enumerate(self.entries):
+            if entry != self.get(entry.uuid, None):
+                changed_textures[entry.uuid] = Texture(
                     index=i,
                     entry=entry,
                     loads=self.__get_read_bytes(i, entry),
                 )
+
+        self.textures |= changed_textures
+
+        return list(changed_textures.values())
+
+    def watch(self, handler: Callable[[list[Texture]], Any]) -> BaseObserver:
+        """Watch the cache directory for changes and call the handler function"""
+
+        def on_modified(event: DirModifiedEvent | FileModifiedEvent) -> None:
+            changed_textures = self.refresh()
+
+            if changed_textures:
+                handler(changed_textures)
+
+        event_handler = PatternMatchingEventHandler(patterns=["texture.entries"])
+        setattr(event_handler, "on_modified", on_modified)
+
+        observer = Observer()
+        observer.schedule(event_handler, str(self.cache_dir.resolve()))
+        observer.start()
+
+        return observer
 
     def get(self, uuid: str, default: Optional[T] = None) -> Texture | T:
         return self.textures.get(uuid, default)  # type: ignore
