@@ -4,10 +4,23 @@ import sys
 from typing import Literal
 from tqdm import tqdm
 
-
 from .signal import interrupthandler
 from .api import Texture, TextureCache
 from .find import find_texturecache, list_texture_cache
+
+OutputMode = Literal["progress", "files", "debug"]
+
+
+class TextureEmptyError(Exception):
+    pass
+
+
+class Args(argparse.Namespace):
+    cache_dir: Path | None
+    output_dir: Path
+    output_mode: OutputMode
+    force: bool
+    raw: bool
 
 
 def prompt_for_cache_dir() -> Path:
@@ -54,14 +67,6 @@ def prompt_for_cache_dir() -> Path:
                 return cache
 
     assert False, "unreachable"
-
-
-class Args(argparse.Namespace):
-    cache_dir: Path | None
-    output_dir: Path
-    output_mode: Literal["progress", "files", "debug"]
-    force: bool
-    raw: bool
 
 
 def parse_args() -> Args:
@@ -119,6 +124,40 @@ def parse_args() -> Args:
     return args
 
 
+def save_texture(
+    texture: Texture,
+    output_dir: Path,
+    force: bool,
+    raw: bool,
+    output_mode: OutputMode,
+) -> None:
+    if texture.is_empty:
+        raise TextureEmptyError
+
+    if raw is False:
+        save_path = output_dir / f"{texture.uuid}.jp2"
+
+        if save_path.exists() and not force:
+            raise FileExistsError
+
+        # the cache stores textures in a raw jpeg2000 codestream format
+        # that is hard for most operating systems to read, which isn't
+        # intended to be used for storage. loading it with pillow puts
+        # it in a proper container format
+        with texture.open_image() as im:
+            im.save(save_path)
+    else:
+        save_path = output_dir / f"{texture.uuid}.j2c"
+
+        if save_path.exists() and not force:
+            raise FileExistsError
+
+        save_path.write_bytes(texture.loads())
+
+    if output_mode in ("files", "debug"):
+        print(save_path.resolve())
+
+
 def main() -> None:
     args = parse_args()
 
@@ -138,7 +177,7 @@ def main() -> None:
     cache = TextureCache(cache_dir)
     existing_textures = 0
     good_writes = 0
-    error_write_textures: list[Texture] = []
+    error_write_textures = 0
 
     if args.output_mode == "debug":
         print("")
@@ -150,7 +189,19 @@ def main() -> None:
     args.output_dir.mkdir(exist_ok=True)
 
     if args.watch:
-        observer = cache.watch(lambda modified_textures: print(modified_textures))
+
+        def handler(modified_textures: list[Texture]) -> None:
+            for texture in modified_textures:
+                try:
+                    save_texture(texture, **args)
+                except TextureEmptyError:
+                    pass
+                except FileExistsError:
+                    existing_textures += 1
+                except OSError:
+                    error_write_textures += 1
+
+        observer = cache.watch(handler)
 
         try:
             while observer.is_alive():
@@ -160,64 +211,42 @@ def main() -> None:
             observer.join()
             exit(0)
 
-    with interrupthandler() as h:
-        for texture in tqdm(
-            cache,
-            total=cache.header["entry_count"],
-            desc="extracting textures",
-            unit="tex",
-            delay=1,
-            disable=args.output_mode != "progress",
-        ):
-            if h.interrupted:
-                # break the loop if the user presses ctrl+c
-                break
-
-            if texture.is_empty:
-                continue
-
-            if args.raw is False:
-                save_path = args.output_dir / f"{texture.uuid}.jp2"
-
-                if save_path.exists() and not args.force:
-                    existing_textures += 1
-                    continue
+    else:
+        with interrupthandler() as h:
+            for texture in tqdm(
+                cache,
+                total=cache.header["entry_count"],
+                desc="extracting textures",
+                unit="tex",
+                delay=1,
+                disable=args.output_mode != "progress",
+            ):
+                if h.interrupted:
+                    # break the loop if the user presses ctrl+c
+                    break
 
                 try:
-                    # the cache stores textures in a raw jpeg2000 codestream format
-                    # that is hard for most operating systems to read, which isn't
-                    # intended to be used for storage. loading it with pillow puts
-                    # it in a proper container format
-                    with texture.open_image() as im:
-                        im.save(save_path)
-                except OSError:
-                    error_write_textures.append(texture)
-                    continue
-            else:
-                save_path = args.output_dir / f"{texture.uuid}.j2c"
-
-                if save_path.exists() and not args.force:
+                    save_texture(texture, **args)
+                except TextureEmptyError:
+                    pass
+                except FileExistsError:
                     existing_textures += 1
-                    continue
+                except OSError:
+                    error_write_textures += 1
 
-                save_path.write_bytes(texture.loads())
+                good_writes += 1
 
-            if args.output_mode in ("files", "debug"):
-                print(save_path.resolve())
+    if args.output_mode in ("progress", "debug"):
+        empty_textures = [texture for texture in cache if texture.is_empty]
 
-            good_writes += 1
-
-        if args.output_mode in ("progress", "debug"):
-            empty_textures = [texture for texture in cache if texture.is_empty]
-
-            print("")
-            print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
-            print(
-                f"skipped {existing_textures} existing textures"
-            ) if existing_textures else None
-            print(
-                f"{len(error_write_textures)} invalid textures could not be written"
-            ) if error_write_textures else None
-            print(
-                f"skipped {len(empty_textures)} empty textures"
-            ) if empty_textures else None
+        print("")
+        print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
+        print(
+            f"skipped {existing_textures} existing textures"
+        ) if existing_textures else None
+        print(
+            f"{error_write_textures} invalid textures could not be written"
+        ) if error_write_textures else None
+        print(
+            f"skipped {len(empty_textures)} empty textures"
+        ) if empty_textures else None
