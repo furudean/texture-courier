@@ -79,22 +79,22 @@ def decode_texture_entries_header(texture_entries: BytesIO) -> Header:
     }
 
 
-def decode_texture_entries(
-    texture_entries: BytesIO, start: int, stop: int
-) -> list[Entry]:
-    start = ENTRY_BYTE_COUNT * start + HEADER_BYTE_COUNT
-    end = ENTRY_BYTE_COUNT * stop + HEADER_BYTE_COUNT
-
-    texture_entries.seek(start)
+def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[Entry]:
+    texture_entries.seek(HEADER_BYTE_COUNT)
     entries = []
 
-    for pos in range(start, end, ENTRY_BYTE_COUNT):
+    for _ in range(entry_count):
         entry_bytes = texture_entries.read(ENTRY_BYTE_COUNT)
 
         if len(entry_bytes) != ENTRY_BYTE_COUNT:
-            continue
+            raise Exception(f"failed to read entry at {texture_entries.tell()}")
 
         entries.append(Entry.from_bytes(entry_bytes))
+
+    if len(entries) != entry_count:
+        raise Exception(
+            f"number of read entries {len(entries)} does not match declared count {entry_count}"
+        )
 
     return entries
 

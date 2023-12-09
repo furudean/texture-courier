@@ -49,7 +49,7 @@ class TextureCache:
     texture_entries_file: BytesIO
     texture_cache_file: BytesIO
 
-    header: core.Header
+    header: core.Header | None = None
     entries: list[core.Entry] = []
     textures: dict[str, Texture] = {}
 
@@ -73,10 +73,11 @@ class TextureCache:
 
     def __repr__(self) -> str:
         total_size = sum(texture.image_size for texture in self)
+        entry_count = self.header["entry_count"] if self.header else 0
 
         return (
             f"<TextureCache {self.cache_dir.resolve()}, "
-            f"{self.header['entry_count']} entries, "
+            f"{entry_count} entries, "
             f"{format_bytes(total_size)}>"
         )
 
@@ -96,21 +97,18 @@ class TextureCache:
         return read_bytes
 
     def refresh(self) -> list[Texture]:
-        old_entry_count = len(self.textures)
+        old_entry_count = self.header["entry_count"] if self.header else 0
 
         self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
         self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.entries")
         self.header = core.decode_texture_entries_header(self.texture_entries_file)
 
-        new_entry_count = self.header["entry_count"]
-
         self.entries = core.decode_texture_entries(
             self.texture_entries_file,
-            start=0,
-            stop=new_entry_count,
+            entry_count=self.header["entry_count"],
         )
 
-        if new_entry_count < old_entry_count:
+        if self.header["entry_count"] < old_entry_count:
             # the cache was cleared
             self.textures = {}
 
