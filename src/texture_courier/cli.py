@@ -253,7 +253,6 @@ def main() -> None:
 
         if args.output_mode in ("progress", "debug"):
             print("watching for changes in texture cache, press ctrl+c to stop")
-            print(f"extracting to {args.output_dir.resolve()}")
             print("")
 
         with interrupthandler() as h:
