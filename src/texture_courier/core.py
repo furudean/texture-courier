@@ -3,7 +3,9 @@ from io import BytesIO
 from pathlib import Path
 import struct
 from uuid import UUID
-from typing import TypedDict
+from typing import Self, TypedDict
+
+from .util import format_bytes
 
 HEADER_STRUCT_FORMAT = "fI32sI"
 HEADER_BYTE_COUNT = 44
@@ -21,11 +23,47 @@ class Header(TypedDict):
     entry_count: int
 
 
-class Entry(TypedDict):
+class Entry:
     uuid: str
     image_size: int
     body_size: int
     time: datetime
+
+    def __init__(self, uuid: str, image_size: int, body_size: int, time: datetime):
+        self.uuid = uuid
+        self.image_size = image_size
+        self.body_size = body_size
+        self.time = time
+
+    def __repr__(self) -> str:
+        size = format_bytes(self.image_size) if not self.is_empty else "empty"
+        return f"<Entry {self.uuid}, {self.time}, {size}>"
+
+    def __eq__(self, value: object) -> bool:
+        return (
+            isinstance(value, Entry)
+            and self.uuid == value.uuid
+            and self.time == value.time
+            and self.body_size == value.body_size
+        )
+
+    @property
+    def is_empty(self) -> bool:
+        return self.image_size <= 0
+
+    @classmethod
+    def from_bytes(cls, b: bytes) -> Self:
+        unpack = struct.unpack(ENTRY_STRUCT_FORMAT, b)
+
+        uuid = str(UUID(int=int.from_bytes(unpack[0:16], byteorder="big")))
+        rest = unpack[16:]
+
+        return cls(
+            uuid=uuid,
+            image_size=rest[0],
+            body_size=rest[1],
+            time=datetime.fromtimestamp(rest[2]),
+        )
 
 
 def decode_texture_entries_header(texture_entries: BytesIO) -> Header:
@@ -41,20 +79,6 @@ def decode_texture_entries_header(texture_entries: BytesIO) -> Header:
     }
 
 
-def decode_texture_entry(b: bytes) -> Entry:
-    unpack = struct.unpack(ENTRY_STRUCT_FORMAT, b)
-
-    uuid = str(UUID(int=int.from_bytes(unpack[0:16], byteorder="big")))
-    rest = unpack[16:]
-
-    return {
-        "uuid": uuid,
-        "image_size": rest[0],
-        "body_size": rest[1],
-        "time": datetime.fromtimestamp(rest[2]),
-    }
-
-
 def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[Entry]:
     texture_entries.seek(HEADER_BYTE_COUNT)
     entries = []
@@ -62,10 +86,10 @@ def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[E
     for _ in range(entry_count):
         entry_bytes = texture_entries.read(ENTRY_BYTE_COUNT)
 
-        if entry_bytes == b"":
-            continue
+        if len(entry_bytes) != ENTRY_BYTE_COUNT:
+            raise Exception(f"failed to read entry at {texture_entries.tell()}")
 
-        entries.append(decode_texture_entry(entry_bytes))
+        entries.append(Entry.from_bytes(entry_bytes))
 
     if len(entries) != entry_count:
         raise Exception(

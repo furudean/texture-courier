@@ -10,7 +10,7 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
-dependencies = ["Pillow~=10.1", "tqdm~=4.66.1"]
+dependencies = ["Pillow~=10.1", "tqdm~=4.66.1", "watchdog~=3.0.0"]
 
 [project.optional-dependencies]
 dev = [
@@ -36,5 +36,6 @@ texture-courier = "texture_courier:main"
 
 [tool.mypy]
 python_version = "3.11"
-strict = true
 exclude = ["build", "dist"]
+strict = true
+untyped_calls_exclude = ["watchdog"]
