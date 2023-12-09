@@ -259,6 +259,7 @@ def main() -> None:
                         force=args.force,
                         raw=args.raw,
                     )
+                    good_writes += 1
 
                     if args.output_mode in ("files", "debug"):
                         print(save_path.resolve())
@@ -269,8 +270,6 @@ def main() -> None:
                     existing_textures += 1
                 except OSError:
                     error_write_textures += 1
-
-                good_writes += 1
 
     if args.output_mode in ("progress", "debug"):
         print("")
@@ -283,6 +282,6 @@ def main() -> None:
         ) if error_write_textures else None
         print(f"skipped {empty_textures} empty textures") if empty_textures else None
 
-    if good_writes == 0:
+    if args.output_mode == "files" and good_writes == 0:
         print("error: no textures were written")
         exit(74)
