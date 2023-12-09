@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 import sys
-from typing import Literal
+from typing import Any, Literal
 from tqdm import tqdm
 
 from .signal import interrupthandler
@@ -129,8 +129,7 @@ def save_texture(
     output_dir: Path,
     force: bool,
     raw: bool,
-    output_mode: OutputMode,
-) -> None:
+) -> Path:
     if texture.is_empty:
         raise TextureEmptyError
 
@@ -154,8 +153,7 @@ def save_texture(
 
         save_path.write_bytes(texture.loads())
 
-    if output_mode in ("files", "debug"):
-        print(save_path.resolve())
+    return save_path
 
 
 def main() -> None:
@@ -175,6 +173,7 @@ def main() -> None:
         cache_dir = prompt_for_cache_dir()
 
     cache = TextureCache(cache_dir)
+    empty_textures = 0
     existing_textures = 0
     good_writes = 0
     error_write_textures = 0
@@ -191,25 +190,53 @@ def main() -> None:
     if args.watch:
 
         def handler(modified_textures: list[Texture]) -> None:
+            nonlocal existing_textures, good_writes, error_write_textures, empty_textures
+
             for texture in modified_textures:
                 try:
-                    save_texture(texture, **args)
+                    save_texture(
+                        texture,
+                        output_dir=args.output_dir,
+                        force=args.force,
+                        raw=args.raw,
+                    )
+                    good_writes += 1
                 except TextureEmptyError:
-                    pass
+                    empty_textures += 1
                 except FileExistsError:
                     existing_textures += 1
                 except OSError:
                     error_write_textures += 1
 
+                printstr = [f"{good_writes} textures extracted"]
+
+                if error_write_textures:
+                    printstr.append(f"{error_write_textures} invalid textures")
+
+                if existing_textures:
+                    printstr.append(f"{existing_textures} existing textures skipped")
+
+                if empty_textures:
+                    printstr.append(f"{empty_textures} empty textures skipped")
+
+                print(", ".join(printstr), end="\r")
+
         observer = cache.watch(handler)
 
-        try:
-            while observer.is_alive():
-                observer.join(1)
-        finally:
-            observer.stop()
-            observer.join()
-            exit(0)
+        if args.output_mode in ("progress", "debug"):
+            print("watching for textures, press ctrl+c to stop")
+            print(f"extracting to {args.output_dir.resolve()}")
+            print("")
+
+        with interrupthandler() as h:
+            try:
+                while observer.is_alive() and not h.interrupted:
+                    observer.join(1)
+            except KeyboardInterrupt:
+                pass
+            finally:
+                observer.stop()
+                observer.join()
 
     else:
         with interrupthandler() as h:
@@ -226,9 +253,18 @@ def main() -> None:
                     break
 
                 try:
-                    save_texture(texture, **args)
+                    save_path = save_texture(
+                        texture,
+                        output_dir=args.output_dir,
+                        force=args.force,
+                        raw=args.raw,
+                    )
+
+                    if args.output_mode in ("files", "debug"):
+                        print(save_path.resolve())
+
                 except TextureEmptyError:
-                    pass
+                    empty_textures += 1
                 except FileExistsError:
                     existing_textures += 1
                 except OSError:
@@ -237,8 +273,6 @@ def main() -> None:
                 good_writes += 1
 
     if args.output_mode in ("progress", "debug"):
-        empty_textures = [texture for texture in cache if texture.is_empty]
-
         print("")
         print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
         print(
@@ -247,6 +281,8 @@ def main() -> None:
         print(
             f"{error_write_textures} invalid textures could not be written"
         ) if error_write_textures else None
-        print(
-            f"skipped {len(empty_textures)} empty textures"
-        ) if empty_textures else None
+        print(f"skipped {empty_textures} empty textures") if empty_textures else None
+
+    if good_writes == 0:
+        print("error: no textures were written")
+        exit(74)
