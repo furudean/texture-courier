@@ -15,7 +15,7 @@ from .util import format_bytes
 
 from PIL import Image
 
-T = TypeVar("T", default=None)
+T = TypeVar("T")
 
 
 def loads_bytes_io(p: Path) -> BytesIO:
@@ -49,7 +49,7 @@ class TextureCache:
     texture_entries_file: BytesIO
     texture_cache_file: BytesIO
 
-    header: core.Header | None = None
+    header: core.Header
     entries: list[core.Entry] = []
     textures: dict[str, Texture] = {}
 
@@ -73,11 +73,10 @@ class TextureCache:
 
     def __repr__(self) -> str:
         total_size = sum(texture.image_size for texture in self)
-        entry_count = self.header["entry_count"] if self.header else 0
 
         return (
             f"<TextureCache {self.cache_dir.resolve()}, "
-            f"{entry_count} entries, "
+            f"{self.header['entry_count']} entries, "
             f"{format_bytes(total_size)}>"
         )
 
@@ -97,7 +96,7 @@ class TextureCache:
         return read_bytes
 
     def refresh(self) -> list[Texture]:
-        old_entry_count = self.header["entry_count"] if self.header else 0
+        old_entry_count = self.header["entry_count"] if hasattr(self, "header") else 0
 
         self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
         self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")

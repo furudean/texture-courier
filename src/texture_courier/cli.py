@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 import sys
-from typing import Any, Literal
+from typing import Literal
 from tqdm import tqdm
 
 from .signal import interrupthandler
@@ -193,8 +193,10 @@ def main() -> None:
             nonlocal existing_textures, good_writes, error_write_textures, empty_textures
 
             for texture in modified_textures:
+                save_path: Path | None = None
+
                 try:
-                    save_texture(
+                    save_path = save_texture(
                         texture,
                         output_dir=args.output_dir,
                         force=args.force,
@@ -208,18 +210,24 @@ def main() -> None:
                 except OSError:
                     error_write_textures += 1
 
-                printstr = [f"{good_writes} textures extracted"]
+                if args.output_mode == "progress":
+                    printstr = [f"{good_writes} textures extracted"]
 
-                if error_write_textures:
-                    printstr.append(f"{error_write_textures} invalid textures")
+                    if error_write_textures:
+                        printstr.append(f"{error_write_textures} incomplete textures")
 
-                if existing_textures:
-                    printstr.append(f"{existing_textures} existing textures skipped")
+                    if existing_textures:
+                        printstr.append(
+                            f"{existing_textures} existing textures skipped"
+                        )
 
-                if empty_textures:
-                    printstr.append(f"{empty_textures} empty textures skipped")
+                    if empty_textures:
+                        printstr.append(f"{empty_textures} empty textures skipped")
 
-                print(", ".join(printstr), end="\r")
+                    print(", ".join(printstr), end="\r")
+
+                if args.output_mode in ("files", "debug") and save_path:
+                    print(save_path.resolve())
 
         observer = cache.watch(handler)
 
