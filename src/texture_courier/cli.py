@@ -175,10 +175,6 @@ def end(
         ) if error_write_textures else None
         print(f"skipped {empty_textures} empty textures") if empty_textures else None
 
-    if args.output_mode == "files" and good_writes == 0:
-        print("error: no textures were written")
-        sys.exit(74)
-
 
 def main() -> None:
     args = parse_args()
@@ -278,8 +274,7 @@ def main() -> None:
                 empty_textures=empty_textures,
             )
 
-            if h.interrupted:
-                sys.exit(130)
+            sys.exit(130)
 
     else:
         with interrupthandler() as h:
@@ -324,3 +319,7 @@ def main() -> None:
 
             if h.interrupted:
                 sys.exit(130)
+
+            if args.output_mode == "files" and good_writes == 0:
+                print("warning: no textures were written")
+                sys.exit(73)
