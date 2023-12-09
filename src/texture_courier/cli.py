@@ -156,6 +156,30 @@ def save_texture(
     return save_path
 
 
+def end(
+    *,
+    args: Args,
+    good_writes: int,
+    existing_textures: int,
+    error_write_textures: int,
+    empty_textures: int,
+) -> None:
+    if args.output_mode in ("progress", "debug"):
+        print("")
+        print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
+        print(
+            f"skipped {existing_textures} existing textures"
+        ) if existing_textures else None
+        print(
+            f"{error_write_textures} invalid textures could not be written"
+        ) if error_write_textures else None
+        print(f"skipped {empty_textures} empty textures") if empty_textures else None
+
+    if args.output_mode == "files" and good_writes == 0:
+        print("error: no textures were written")
+        sys.exit(74)
+
+
 def main() -> None:
     args = parse_args()
 
@@ -246,6 +270,17 @@ def main() -> None:
                 observer.stop()
                 observer.join()
 
+            end(
+                args=args,
+                good_writes=good_writes,
+                existing_textures=existing_textures,
+                error_write_textures=error_write_textures,
+                empty_textures=empty_textures,
+            )
+
+            if h.interrupted:
+                sys.exit(130)
+
     else:
         with interrupthandler() as h:
             for texture in tqdm(
@@ -279,17 +314,13 @@ def main() -> None:
                 except OSError:
                     error_write_textures += 1
 
-    if args.output_mode in ("progress", "debug"):
-        print("")
-        print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
-        print(
-            f"skipped {existing_textures} existing textures"
-        ) if existing_textures else None
-        print(
-            f"{error_write_textures} invalid textures could not be written"
-        ) if error_write_textures else None
-        print(f"skipped {empty_textures} empty textures") if empty_textures else None
+            end(
+                args=args,
+                good_writes=good_writes,
+                existing_textures=existing_textures,
+                error_write_textures=error_write_textures,
+                empty_textures=empty_textures,
+            )
 
-    if args.output_mode == "files" and good_writes == 0:
-        print("error: no textures were written")
-        exit(74)
+            if h.interrupted:
+                sys.exit(130)
