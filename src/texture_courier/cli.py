@@ -252,7 +252,7 @@ def main() -> None:
         observer = cache.watch(handler)
 
         if args.output_mode in ("progress", "debug"):
-            print("watching for textures, press ctrl+c to stop")
+            print("watching for changes in texture cache, press ctrl+c to stop")
             print(f"extracting to {args.output_dir.resolve()}")
             print("")
 
