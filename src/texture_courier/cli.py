@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 from .signal import interrupthandler
 from .api import Texture, TextureCache
-from .find import find_texturecache, list_texture_cache
+from .find import find_texturecache, list_texture_caches
 
 OutputMode = Literal["progress", "files", "debug"]
 
@@ -25,7 +25,7 @@ class Args(argparse.Namespace):
 
 def prompt_for_cache_dir() -> Path:
     try:
-        caches = list_texture_cache()
+        caches = list_texture_caches()
     except FileNotFoundError:
         print("error: no cache found")
         print('try specificying a cache directory with "texture-courier <cache_dir>"')
@@ -182,7 +182,7 @@ def main() -> None:
         print("")
         print("TEXTURE ENTRIES HEADER:")
 
-        for k, v in cache.header.items():
+        for k, v in cache.header:
             print(f"{k}: {v}")
 
     args.output_dir.mkdir(exist_ok=True)
@@ -250,7 +250,7 @@ def main() -> None:
         with interrupthandler() as h:
             for texture in tqdm(
                 cache,
-                total=cache.header["entry_count"],
+                total=cache.header.entry_count,
                 desc="extracting textures",
                 unit="tex",
                 delay=1,

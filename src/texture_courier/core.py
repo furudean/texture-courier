@@ -3,7 +3,7 @@ from io import BytesIO
 from pathlib import Path
 import struct
 from uuid import UUID
-from typing import Self, TypedDict
+from typing import Any, Iterator, Self
 
 from .util import format_bytes
 
@@ -16,11 +16,42 @@ ENTRY_BYTE_COUNT = 28
 TEXTURE_CACHE_BYTE_COUNT = 600
 
 
-class Header(TypedDict):
+class Header:
     version: str
     address_size: int
     encoder: str
     entry_count: int
+
+    def __init__(self, version: str, address_size: int, encoder: str, entry_count: int):
+        self.version = version
+        self.address_size = address_size
+        self.encoder = encoder
+        self.entry_count = entry_count
+
+    def __repr__(self) -> str:
+        return (
+            "<Header "
+            f'version="{self.version}", '
+            f"address_size={self.address_size}, "
+            f'encoder="{self.encoder}", '
+            f"entry_count={self.entry_count}>"
+        )
+
+    def __iter__(self) -> Iterator[tuple[str, Any]]:
+        return iter(self.__dict__.items())
+
+    @classmethod
+    def from_texture_entries(cls, texture_entries: BytesIO) -> Self:
+        texture_entries.seek(0)
+        header = texture_entries.read(HEADER_BYTE_COUNT)
+        unpack = struct.unpack(HEADER_STRUCT_FORMAT, header)
+
+        return cls(
+            version="%0.2f" % unpack[0],
+            address_size=unpack[1],
+            encoder=unpack[2].decode("utf-8").replace("\x00", ""),
+            entry_count=unpack[3],
+        )
 
 
 class Entry:
@@ -64,19 +95,6 @@ class Entry:
             body_size=rest[1],
             time=datetime.fromtimestamp(rest[2]),
         )
-
-
-def decode_texture_entries_header(texture_entries: BytesIO) -> Header:
-    texture_entries.seek(0)
-    header = texture_entries.read(HEADER_BYTE_COUNT)
-    unpacked = struct.unpack(HEADER_STRUCT_FORMAT, header)
-
-    return {
-        "version": "%0.2f" % unpacked[0],
-        "address_size": unpacked[1],
-        "encoder": unpacked[2].decode("utf-8").replace("\x00", ""),
-        "entry_count": unpacked[3],
-    }
 
 
 def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[Entry]:

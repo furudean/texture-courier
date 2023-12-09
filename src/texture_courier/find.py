@@ -32,7 +32,7 @@ def find_texturecache(path: Path) -> Path | None:
     return None
 
 
-def list_texture_cache() -> list[Path]:
+def list_texture_caches() -> list[Path]:
     valid_cache_roots = [path for path in os_cache_roots if path.exists()]
 
     # find all the possible combinations of cache root and viewer dirs

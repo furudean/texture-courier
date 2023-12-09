@@ -10,7 +10,13 @@ from watchdog.events import (
     FileModifiedEvent,
 )
 
-from . import core
+from .core import (
+    Header,
+    Entry,
+    read_texture_cache,
+    read_texture_body,
+    decode_texture_entries,
+)
 from .util import format_bytes
 
 from PIL import Image
@@ -22,12 +28,12 @@ def loads_bytes_io(p: Path) -> BytesIO:
     return BytesIO(p.read_bytes())
 
 
-class Texture(core.Entry):
+class Texture(Entry):
     index: int
     loads: Callable[[], bytes]
     """Open texture as a bytes object"""
 
-    def __init__(self, *, index: int, entry: core.Entry, loads: Callable[[], bytes]):
+    def __init__(self, *, index: int, entry: Entry, loads: Callable[[], bytes]):
         super().__init__(**entry.__dict__)
 
         self.index = index
@@ -49,8 +55,8 @@ class TextureCache:
     texture_entries_file: BytesIO
     texture_cache_file: BytesIO
 
-    header: core.Header
-    entries: list[core.Entry] = []
+    header: Header
+    entries: list[Entry] = []
     textures: dict[str, Texture] = {}
 
     def __init__(self, cache_dir: str | Path):
@@ -76,38 +82,38 @@ class TextureCache:
 
         return (
             f"<TextureCache {self.cache_dir.resolve()}, "
-            f"{self.header['entry_count']} entries, "
+            f"{self.header.entry_count} entries, "
             f"{format_bytes(total_size)}>"
         )
 
-    def __get_read_bytes(self, i: int, entry: core.Entry) -> Callable[[], bytes]:
+    def __get_read_bytes(self, i: int, entry: Entry) -> Callable[[], bytes]:
         def read_bytes() -> bytes:
-            head = core.read_texture_cache(self.texture_cache_file, i)
+            head = read_texture_cache(self.texture_cache_file, i)
 
             if entry.image_size <= 601 and entry.body_size == 0:
                 # sometimes the file is smaller than 600 bytes, so using the head is
                 # sufficient
                 return head
             else:
-                body = core.read_texture_body(entry.uuid, cache_dir=self.cache_dir)
+                body = read_texture_body(entry.uuid, cache_dir=self.cache_dir)
 
                 return head + body
 
         return read_bytes
 
     def refresh(self) -> list[Texture]:
-        old_entry_count = self.header["entry_count"] if hasattr(self, "header") else 0
+        old_entry_count = self.header.entry_count if hasattr(self, "header") else 0
 
         self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
         self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
-        self.header = core.decode_texture_entries_header(self.texture_entries_file)
+        self.header = Header.from_texture_entries(self.texture_entries_file)
 
-        self.entries = core.decode_texture_entries(
+        self.entries = decode_texture_entries(
             self.texture_entries_file,
-            entry_count=self.header["entry_count"],
+            entry_count=self.header.entry_count,
         )
 
-        if self.header["entry_count"] < old_entry_count:
+        if self.header.entry_count < old_entry_count:
             # the cache was cleared
             self.textures = {}
 
