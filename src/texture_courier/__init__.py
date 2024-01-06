@@ -9,5 +9,5 @@ from .find import list_texture_caches  # noqa
 if __name__ == "__main__":
     try:
         main()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, EOFError):
         sys.exit(130)
