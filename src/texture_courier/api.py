@@ -9,6 +9,7 @@ from watchdog.events import (
     DirModifiedEvent,
     FileModifiedEvent,
 )
+from PIL import Image
 
 from .core import (
     Header,
@@ -19,9 +20,12 @@ from .core import (
 )
 from .util import format_bytes
 
-from PIL import Image
 
 T = TypeVar("T")
+JPEG2000_MAGIC_NUMBERS = (
+    bytes.fromhex("00 00 00 0C 6A 50 20 20 0D 0A"),
+    bytes.fromhex("FF 4F FF 51"),
+)
 
 
 def loads_bytes_io(p: Path) -> BytesIO:
@@ -30,6 +34,7 @@ def loads_bytes_io(p: Path) -> BytesIO:
 
 class Texture(Entry):
     index: int
+    signature_valid: bool
     loads: Callable[[], bytes]
     """Open texture as a bytes object"""
 
@@ -47,6 +52,11 @@ class Texture(Entry):
         """Open texture as a pillow image"""
 
         b = self.loads()
+
+        self.signature_valid = any(
+            [b[: len(sig)] == sig for sig in JPEG2000_MAGIC_NUMBERS]
+        )
+
         return Image.open(BytesIO(b), formats=["jpeg2000"])
 
 

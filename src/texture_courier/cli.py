@@ -11,7 +11,17 @@ from .find import find_texturecache, list_texture_caches
 OutputMode = Literal["progress", "files", "debug"]
 
 
-class TextureEmptyError(Exception):
+class TextureError(Exception):
+    pass
+
+
+class TextureEmptyError(TextureError):
+    pass
+
+
+class TextureSignatureInvalid(TextureError):
+    # to be raised if magic numbers not found at the start of buffer, like
+    # 00 00 00 0C 6A 50 20 20 0D 0A 87 0A 00 00 00 14 66 74 79 70 6A 70 32
     pass
 
 
