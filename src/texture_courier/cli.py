@@ -279,7 +279,7 @@ def main() -> None:
                     if empty_textures:
                         printstr.append(f"{empty_textures} empty skipped")
 
-                    print(", ".join(printstr), end="\r")
+                    print(", ".join(printstr), end="\r", flush=True)
 
                 if args.output_mode in ("files", "debug") and save_path:
                     print(save_path.resolve())
