@@ -1,7 +1,6 @@
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional
-from typing_extensions import TypeVar
+from typing import Any, Callable, Iterator, Optional, TypeVar
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
 from watchdog.events import (
