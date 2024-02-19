@@ -14,6 +14,7 @@ from .core import (
     Entry,
     read_texture_cache,
     read_texture_body,
+    texture_location,
     decode_texture_entries,
 )
 from .util import format_bytes
@@ -29,18 +30,41 @@ def loads_bytes_io(p: Path) -> BytesIO:
 
 class Texture(Entry):
     index: int
+    body_path: Path
     loads: Callable[[], bytes]
     """Open texture as a bytes object"""
 
-    def __init__(self, *, index: int, entry: Entry, loads: Callable[[], bytes]):
+    def __init__(
+        self,
+        *,
+        index: int,
+        entry: Entry,
+        body_path: Path,
+        loads: Callable[[], bytes],
+    ):
         super().__init__(**entry.__dict__)
 
         self.index = index
+        self.body_path = body_path
         self.loads = loads
 
     def __repr__(self) -> str:
         size = format_bytes(self.image_size) if not self.is_empty else "empty"
-        return f"<Texture {self.uuid}, {self.time}, {size}>"
+        return f"<Texture {self.uuid}, {self.time}, {size}, is_downloaded={self.is_downloaded()}>"
+
+    def is_downloaded(self) -> bool:
+        """Check if the texture file is fully downloaded"""
+        return self.fs_size() == self.image_size
+
+    def fs_size(self) -> int:
+        """Get the size of the texture file on disk"""
+        if self.is_empty:
+            return 0
+
+        head_size = self.image_size - self.body_size
+        body_size = self.body_path.stat().st_size if self.body_path.is_file() else 0
+
+        return head_size + body_size
 
     def open_image(self) -> Image.Image:
         """Open texture as a pillow image"""
@@ -73,6 +97,9 @@ class TextureCache:
     def __iter__(self) -> Iterator[Texture]:
         return iter(self.textures.values())
 
+    def __reversed__(self) -> Iterator[Texture]:
+        return reversed(self.textures.values())
+
     def __len__(self) -> int:
         return len(self.textures)
 
@@ -94,13 +121,14 @@ class TextureCache:
                 # sufficient
                 return head
             else:
-                body = read_texture_body(entry.uuid, cache_dir=self.cache_dir)
+                path = texture_location(self.cache_dir, entry.uuid)
+                body = read_texture_body(path)
 
                 return head + body
 
         return read_bytes
 
-    def refresh(self) -> list[Texture]:
+    def refresh(self) -> Iterator[Texture]:
         old_entry_count = self.header.entry_count if hasattr(self, "header") else 0
 
         self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
@@ -124,17 +152,18 @@ class TextureCache:
                     index=i,
                     entry=entry,
                     loads=self.__get_read_bytes(i, entry),
+                    body_path=texture_location(self.cache_dir, entry.uuid),
                 )
 
         self.textures |= changed_textures
 
-        return list(changed_textures.values())
+        return iter(changed_textures.values())
 
     def watch(self, handler: Callable[[list[Texture]], Any]) -> BaseObserver:
-        """Watch the cache directory for changes and call the handler function"""
+        """Watch the cache directory for changes and call the handler function on updates."""
 
         def on_modified(event: DirModifiedEvent | FileModifiedEvent) -> None:
-            changed_textures = self.refresh()
+            changed_textures = list(self.refresh())
 
             if changed_textures:
                 handler(changed_textures)

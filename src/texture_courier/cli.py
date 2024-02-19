@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 from typing import Literal
 from tqdm import tqdm
+import os
 
 from .signal import interrupthandler
 from .api import Texture, TextureCache
@@ -15,12 +16,21 @@ class TextureEmptyError(Exception):
     pass
 
 
+class TextureIncompleteError(Exception):
+    pass
+
+
 class Args(argparse.Namespace):
     cache_dir: Path | None
     output_dir: Path
     output_mode: OutputMode
     force: bool
     raw: bool
+    skip_integrity: bool
+
+
+def clear_screen() -> None:
+    os.system("cls" if os.name == "nt" else "clear")
 
 
 def prompt_for_cache_dir() -> Path:
@@ -118,25 +128,30 @@ def parse_args() -> Args:
         default=False,
     )
 
+    parser.add_argument(
+        "--skip-integrity",
+        action="store_true",
+        help="skip integrity checks",
+        default=False,
+    )
+
     args = Args()
     parser.parse_args(namespace=args)
 
     return args
 
 
-def save_texture(
-    texture: Texture,
-    output_dir: Path,
-    force: bool,
-    raw: bool,
-) -> Path:
+def save_texture(texture: Texture, output_dir: Path, args: Args) -> Path:
     if texture.is_empty:
         raise TextureEmptyError
 
-    if raw is False:
+    if texture.is_downloaded() is False and not args.skip_integrity:
+        raise TextureIncompleteError
+
+    if args.raw is False:
         save_path = output_dir / f"{texture.uuid}.jp2"
 
-        if save_path.exists() and not force:
+        if save_path.exists() and not args.force:
             raise FileExistsError
 
         # the cache stores textures in a raw jpeg2000 codestream format
@@ -148,10 +163,14 @@ def save_texture(
     else:
         save_path = output_dir / f"{texture.uuid}.j2c"
 
-        if save_path.exists() and not force:
+        if save_path.exists() and not args.force:
             raise FileExistsError
 
         save_path.write_bytes(texture.loads())
+
+    # set last access and modification times to the same as the date in cache
+    # (atime, mtime)
+    os.utime(save_path, (texture.time.timestamp(), texture.time.timestamp()))
 
     return save_path
 
@@ -161,19 +180,27 @@ def end(
     args: Args,
     good_writes: int,
     existing_textures: int,
+    incomplete_textures: int,
     error_write_textures: int,
     empty_textures: int,
 ) -> None:
     if args.output_mode in ("progress", "debug"):
         print("")
         print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
-        print(
-            f"skipped {existing_textures} existing textures"
-        ) if existing_textures else None
-        print(
-            f"{error_write_textures} invalid textures could not be written"
-        ) if error_write_textures else None
+        (
+            print(f"skipped {existing_textures} existing textures")
+            if existing_textures
+            else None
+        )
+        if incomplete_textures:
+            print(f"skipped {incomplete_textures} incomplete textures")
+        (
+            print(f"{error_write_textures} textures could not be written")
+            if error_write_textures
+            else None
+        )
         print(f"skipped {empty_textures} empty textures") if empty_textures else None
+        print("")
 
 
 def main() -> None:
@@ -197,6 +224,7 @@ def main() -> None:
     existing_textures = 0
     good_writes = 0
     error_write_textures = 0
+    incomplete_textures = 0
 
     if args.output_mode == "debug":
         print("")
@@ -208,6 +236,7 @@ def main() -> None:
     args.output_dir.mkdir(exist_ok=True)
 
     if args.watch:
+        incomplete_stack: set[str] = set()
 
         def handler(modified_textures: list[Texture]) -> None:
             nonlocal existing_textures, good_writes, error_write_textures, empty_textures
@@ -219,30 +248,36 @@ def main() -> None:
                     save_path = save_texture(
                         texture,
                         output_dir=args.output_dir,
-                        force=args.force,
-                        raw=args.raw,
+                        args=args,
                     )
                     good_writes += 1
+                    incomplete_stack.discard(texture.uuid)
                 except TextureEmptyError:
                     empty_textures += 1
                 except FileExistsError:
                     existing_textures += 1
-                except OSError:
+                except TextureIncompleteError:
+                    incomplete_stack.add(texture.uuid)
+                except OSError as e:
                     error_write_textures += 1
+
+                    if args.output_mode == "debug":
+                        print(f"error writing {texture.uuid}: {e}")
 
                 if args.output_mode == "progress":
                     printstr = [f"{good_writes} textures extracted"]
 
+                    if len(incomplete_stack):
+                        printstr.append(f"{len(incomplete_stack)} incomplete")
+
                     if error_write_textures:
-                        printstr.append(f"{error_write_textures} incomplete textures")
+                        printstr.append(f"{error_write_textures} failed")
 
                     if existing_textures:
-                        printstr.append(
-                            f"{existing_textures} existing textures skipped"
-                        )
+                        printstr.append(f"{existing_textures} existing skipped")
 
                     if empty_textures:
-                        printstr.append(f"{empty_textures} empty textures skipped")
+                        printstr.append(f"{empty_textures} empty skipped")
 
                     print(", ".join(printstr), end="\r")
 
@@ -251,8 +286,13 @@ def main() -> None:
 
         observer = cache.watch(handler)
 
+        clear_screen()
+
         if args.output_mode in ("progress", "debug"):
-            print("watching for changes in texture cache, press ctrl+c to stop")
+            print(f"watching for changes in {cache.cache_dir.resolve()}")
+            print(f"extracting to {args.output_dir.resolve()}")
+            print("")
+            print("input ctrl+c or ctrl+d to stop")
             print("")
 
         with interrupthandler() as h:
@@ -269,6 +309,7 @@ def main() -> None:
                 args=args,
                 good_writes=good_writes,
                 existing_textures=existing_textures,
+                incomplete_textures=len(incomplete_stack),
                 error_write_textures=error_write_textures,
                 empty_textures=empty_textures,
             )
@@ -276,6 +317,9 @@ def main() -> None:
             sys.exit(130)
 
     else:
+        if args.output_mode in ("progress", "debug"):
+            print(f"extracting to {args.output_dir.resolve()}")
+
         with interrupthandler() as h:
             for texture in tqdm(
                 cache,
@@ -293,8 +337,7 @@ def main() -> None:
                     save_path = save_texture(
                         texture,
                         output_dir=args.output_dir,
-                        force=args.force,
-                        raw=args.raw,
+                        args=args,
                     )
                     good_writes += 1
 
@@ -303,6 +346,8 @@ def main() -> None:
 
                 except TextureEmptyError:
                     empty_textures += 1
+                except TextureIncompleteError:
+                    incomplete_textures += 1
                 except FileExistsError:
                     existing_textures += 1
                 except OSError:
@@ -311,6 +356,7 @@ def main() -> None:
             end(
                 args=args,
                 good_writes=good_writes,
+                incomplete_textures=incomplete_textures,
                 existing_textures=existing_textures,
                 error_write_textures=error_write_textures,
                 empty_textures=empty_textures,

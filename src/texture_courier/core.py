@@ -127,14 +127,16 @@ def read_texture_cache(texture_cache: BytesIO, n: int) -> bytes:
         )
 
 
-def read_texture_body(uuid: str, cache_dir: Path) -> bytes:
+def texture_location(cache_dir: Path, uuid: str) -> Path:
     subdir = uuid[0]
     texture_file = uuid + ".texture"
 
-    path_to_body = cache_dir / subdir / texture_file
+    return cache_dir / subdir / texture_file
 
-    if not path_to_body.exists():
-        raise FileNotFoundError(f"no texture body at {path_to_body}")
 
-    with open(path_to_body, "rb") as body_file:
+def read_texture_body(path: Path) -> bytes:
+    if not path.is_file():
+        raise FileNotFoundError(f"no texture body at {path}")
+
+    with open(path, "rb") as body_file:
         return body_file.read()
