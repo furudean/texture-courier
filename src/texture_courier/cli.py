@@ -220,11 +220,8 @@ def main() -> None:
         cache_dir = prompt_for_cache_dir()
 
     cache = TextureCache(cache_dir)
-    empty_textures = 0
     existing_textures = 0
     good_writes = 0
-    error_write_textures = 0
-    incomplete_textures = 0
 
     if args.output_mode == "debug":
         print("")
@@ -237,9 +234,11 @@ def main() -> None:
 
     if args.watch:
         incomplete_stack: set[str] = set()
+        failed_stack: set[str] = set()
+        empty_stack: set[str] = set()
 
         def handler(modified_textures: list[Texture]) -> None:
-            nonlocal existing_textures, good_writes, error_write_textures, empty_textures
+            nonlocal existing_textures, good_writes
 
             for texture in modified_textures:
                 save_path: Path | None = None
@@ -250,16 +249,19 @@ def main() -> None:
                         output_dir=args.output_dir,
                         args=args,
                     )
+
                     good_writes += 1
+                    empty_stack.discard(texture.uuid)
+                    failed_stack.discard(texture.uuid)
                     incomplete_stack.discard(texture.uuid)
                 except TextureEmptyError:
-                    empty_textures += 1
+                    empty_stack.add(texture.uuid)
                 except FileExistsError:
                     existing_textures += 1
                 except TextureIncompleteError:
                     incomplete_stack.add(texture.uuid)
                 except OSError as e:
-                    error_write_textures += 1
+                    failed_stack.add(texture.uuid)
 
                     if args.output_mode == "debug":
                         print(f"error writing {texture.uuid}: {e}")
@@ -270,14 +272,14 @@ def main() -> None:
                     if len(incomplete_stack):
                         printstr.append(f"{len(incomplete_stack)} incomplete")
 
-                    if error_write_textures:
-                        printstr.append(f"{error_write_textures} failed")
+                    if len(failed_stack):
+                        printstr.append(f"{len(failed_stack)} failed")
 
                     if existing_textures:
                         printstr.append(f"{existing_textures} existing skipped")
 
-                    if empty_textures:
-                        printstr.append(f"{empty_textures} empty skipped")
+                    if len(empty_stack):
+                        printstr.append(f"{len(empty_stack)} empty skipped")
 
                     print(", ".join(printstr), end="\r", flush=True)
 
@@ -310,13 +312,17 @@ def main() -> None:
                 good_writes=good_writes,
                 existing_textures=existing_textures,
                 incomplete_textures=len(incomplete_stack),
-                error_write_textures=error_write_textures,
-                empty_textures=empty_textures,
+                error_write_textures=len(failed_stack),
+                empty_textures=len(empty_stack),
             )
 
             sys.exit(130)
 
     else:
+        empty_textures = 0
+        error_write_textures = 0
+        incomplete_textures = 0
+
         if args.output_mode in ("progress", "debug"):
             print(f"extracting to {args.output_dir.resolve()}")
 
