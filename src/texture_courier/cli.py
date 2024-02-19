@@ -323,9 +323,6 @@ def main() -> None:
         error_write_textures = 0
         incomplete_textures = 0
 
-        if args.output_mode in ("progress", "debug"):
-            print(f"extracting to {args.output_dir.resolve()}")
-
         with interrupthandler() as h:
             for texture in tqdm(
                 cache,
