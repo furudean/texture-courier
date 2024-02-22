@@ -220,7 +220,6 @@ def main() -> None:
         cache_dir = prompt_for_cache_dir()
 
     cache = TextureCache(cache_dir)
-    existing_textures = 0
     good_writes = 0
 
     if args.output_mode == "debug":
@@ -236,9 +235,10 @@ def main() -> None:
         incomplete_stack: set[str] = set()
         failed_stack: set[str] = set()
         empty_stack: set[str] = set()
+        existing_stack: set[str] = set()
 
         def handler(modified_textures: list[Texture]) -> None:
-            nonlocal existing_textures, good_writes
+            nonlocal good_writes
 
             for texture in modified_textures:
                 save_path: Path | None = None
@@ -257,7 +257,8 @@ def main() -> None:
                 except TextureEmptyError:
                     empty_stack.add(texture.uuid)
                 except FileExistsError:
-                    existing_textures += 1
+                    existing_stack.add(texture.uuid)
+                    failed_stack.discard(texture.uuid)
                 except TextureIncompleteError:
                     incomplete_stack.add(texture.uuid)
                 except OSError as e:
@@ -275,8 +276,8 @@ def main() -> None:
                     if len(failed_stack):
                         printstr.append(f"{len(failed_stack)} failed")
 
-                    if existing_textures:
-                        printstr.append(f"{existing_textures} existing skipped")
+                    if len(existing_stack):
+                        printstr.append(f"{len(existing_stack)} existing skipped")
 
                     if len(empty_stack):
                         printstr.append(f"{len(empty_stack)} empty skipped")
@@ -310,7 +311,7 @@ def main() -> None:
             end(
                 args=args,
                 good_writes=good_writes,
-                existing_textures=existing_textures,
+                existing_textures=len(existing_stack),
                 incomplete_textures=len(incomplete_stack),
                 error_write_textures=len(failed_stack),
                 empty_textures=len(empty_stack),
@@ -322,6 +323,7 @@ def main() -> None:
         empty_textures = 0
         error_write_textures = 0
         incomplete_textures = 0
+        existing_textures = 0
 
         with interrupthandler() as h:
             for texture in tqdm(
