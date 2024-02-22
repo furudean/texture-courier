@@ -195,7 +195,7 @@ def end(
         if incomplete_textures:
             print(f"skipped {incomplete_textures} incomplete textures")
         (
-            print(f"{error_write_textures} textures could not be written")
+            print(f"{error_write_textures} invalid textures could not be written")
             if error_write_textures
             else None
         )
