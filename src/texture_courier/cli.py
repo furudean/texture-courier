@@ -195,7 +195,7 @@ def end(
         if incomplete_textures:
             print(f"skipped {incomplete_textures} incomplete textures")
         (
-            print(f"{error_write_textures} invalid textures could not be written")
+            print(f"{error_write_textures} incomplete/invalid textures not saved")
             if error_write_textures
             else None
         )
@@ -274,7 +274,7 @@ def main() -> None:
                         printstr.append(f"{len(incomplete_stack)} incomplete")
 
                     if len(failed_stack):
-                        printstr.append(f"{len(failed_stack)} failed")
+                        printstr.append(f"{len(failed_stack)} incomplete/failed")
 
                     if len(existing_stack):
                         printstr.append(f"{len(existing_stack)} existing skipped")
