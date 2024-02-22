@@ -5,7 +5,7 @@ os_cache_roots = [
     # posix
     Path.home(),
     # windows
-    Path("%LocaleAppData%"),
+    Path(r"%LocalAppData%"),
     # mac
     Path.home() / "Library/Caches",
 ]
