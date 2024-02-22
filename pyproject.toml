@@ -10,15 +10,15 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
 ]
-dependencies = ["Pillow>=10.1", "tqdm>=4.66.0", "watchdog>=3.0.0"]
+dependencies = ["Pillow>=10", "tqdm>=4", "watchdog>=3"]
 
 [project.optional-dependencies]
 dev = [
-  "mypy>=1.7.0",
-  "flake8>=6.1.0",
-  "types-setuptools>=68.2",
-  "types-Pillow>=10.1.0.0",
-  "types-tqdm>=4.66.0.0",
+  "mypy>=1",
+  "flake8>=6",
+  "types-setuptools",
+  "types-Pillow>=10",
+  "types-tqdm>=4",
 ]
 
 [project.urls]
