@@ -1,4 +1,5 @@
 .vscode/
+.python-version
 /dist/
 /build/
 __pycache__

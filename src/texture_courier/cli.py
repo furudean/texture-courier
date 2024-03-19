@@ -4,6 +4,7 @@ import sys
 from typing import Literal
 from tqdm import tqdm
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 
 from .signal import interrupthandler
 from .api import Texture, TextureCache
@@ -12,11 +13,15 @@ from .find import find_texturecache, list_texture_caches
 OutputMode = Literal["progress", "files", "debug"]
 
 
-class TextureEmptyError(Exception):
+class TextureError(Exception):
     pass
 
 
-class TextureIncompleteError(Exception):
+class TextureEmptyError(TextureError):
+    pass
+
+
+class TextureIncompleteError(TextureError):
     pass
 
 
@@ -325,51 +330,63 @@ def main() -> None:
         incomplete_textures = 0
         existing_textures = 0
 
-        with interrupthandler() as h:
-            for texture in tqdm(
-                cache,
-                total=cache.header.entry_count,
-                desc="extracting textures",
-                unit="tex",
-                delay=1,
-                disable=args.output_mode != "progress",
-            ):
-                if h.interrupted:
-                    # break the loop if the user presses ctrl+c
-                    break
-
-                try:
-                    save_path = save_texture(
-                        texture,
-                        output_dir=args.output_dir,
-                        args=args,
-                    )
-                    good_writes += 1
-
-                    if args.output_mode in ("files", "debug"):
-                        print(save_path.resolve())
-
-                except TextureEmptyError:
-                    empty_textures += 1
-                except TextureIncompleteError:
-                    incomplete_textures += 1
-                except FileExistsError:
-                    existing_textures += 1
-                except OSError:
-                    error_write_textures += 1
-
-            end(
+    def job(texture: Texture) -> Path | Exception:
+        try:
+            return save_texture(
+                texture,
+                output_dir=args.output_dir,
                 args=args,
-                good_writes=good_writes,
-                incomplete_textures=incomplete_textures,
-                existing_textures=existing_textures,
-                error_write_textures=error_write_textures,
-                empty_textures=empty_textures,
             )
+        except Exception as e:
+            return e
 
-            if h.interrupted:
-                sys.exit(130)
+    with interrupthandler() as h:
+        with tqdm(
+            total=cache.header.entry_count,
+            desc="extracting textures",
+            unit="tex",
+            delay=1,
+            leave=False,
+            disable=args.output_mode != "progress",
+        ) as progress:
+            with ThreadPoolExecutor() as executor:
+                for path_or_ex in executor.map(job, cache):
+                    if h.interrupted:
+                        progress.close()
+                        break
+                    else:
+                        progress.update()
 
-            if args.output_mode == "files" and good_writes == 0:
-                print("warning: no textures were written")
-                sys.exit(73)
+                    try:
+                        if isinstance(path_or_ex, Exception):
+                            raise path_or_ex
+                        else:
+                            good_writes += 1
+                    except TextureEmptyError:
+                        empty_textures += 1
+                    except TextureIncompleteError:
+                        incomplete_textures += 1
+                    except FileExistsError:
+                        existing_textures += 1
+                    except Exception:
+                        error_write_textures += 1
+
+                    progress.set_postfix(
+                        ok=good_writes,
+                        incomplete=incomplete_textures,
+                        error=error_write_textures,
+                        empty=empty_textures,
+                    )
+
+    end(
+        args=args,
+        good_writes=good_writes,
+        incomplete_textures=incomplete_textures,
+        existing_textures=existing_textures,
+        error_write_textures=error_write_textures,
+        empty_textures=empty_textures,
+    )
+
+    if args.output_mode == "files" and good_writes == 0:
+        print("warning: no textures were written")
+        sys.exit(73)

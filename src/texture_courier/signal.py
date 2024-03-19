@@ -28,9 +28,13 @@ class interrupthandler(ContextDecorator):
             sys.exit(130)
 
     def handler(self, signalnum: int, frame: FrameType | None) -> None:
-        self.interrupted = True
-
         if self.immediate:
             self.__exit__()
 
-        print("\ninterrupt signal received, exiting gracefully...")
+        if self.interrupted:
+            # called for a second time, exit immediately
+            sys.exit(130)
+
+        self.interrupted = True
+
+        print("\ninterrupt signal received, exiting gracefully... (interrupt again to exit immediately)")
