@@ -179,7 +179,7 @@ def save_texture(texture: Texture, output_dir: Path, args: Args) -> Path:
     return save_path
 
 
-def print_text_frame(string_lst: list[str], width=None) -> None:
+def print_text_frame(string_lst: list[str], width: int | None = None) -> None:
     if width is None:
         width = max(len(line) for line in string_lst) + 4
 
