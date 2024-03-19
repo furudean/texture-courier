@@ -4,7 +4,6 @@ import sys
 from typing import Literal
 from tqdm import tqdm
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 
 from .signal import interrupthandler
 from .api import Texture, TextureCache
@@ -180,7 +179,7 @@ def save_texture(texture: Texture, output_dir: Path, args: Args) -> Path:
     return save_path
 
 
-def print_text_frame(string_lst, width=None):
+def print_text_frame(string_lst: list[str], width=None) -> None:
     if width is None:
         width = max(len(line) for line in string_lst) + 4
 
