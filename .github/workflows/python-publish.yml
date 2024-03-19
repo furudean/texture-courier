@@ -19,16 +19,17 @@ jobs:
       url: https://pypi.org/p/texture_courier
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python
-      uses: actions/setup-python@v3
-      with:
-        python-version: '3.x'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install .[dev]
-    - name: Build package
-      run: python -m build
-    - name: Publish package distributions to PyPy
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: "3.x"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python3 -m pip install --upgrade build
+          pip install .[dev]
+      - name: Build package
+        run: python -m build
+      - name: Publish package distributions to PyPy
+        uses: pypa/gh-action-pypi-publish@release/v1
