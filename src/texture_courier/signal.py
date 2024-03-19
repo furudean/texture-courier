@@ -37,4 +37,4 @@ class interrupthandler(ContextDecorator):
 
         self.interrupted = True
 
-        print("\ninterrupt signal received, exiting gracefully... (interrupt again to exit immediately)")
+        print("\nexiting... (ctrl+c to exit immediately)", flush=True)

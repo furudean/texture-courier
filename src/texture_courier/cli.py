@@ -180,6 +180,17 @@ def save_texture(texture: Texture, output_dir: Path, args: Args) -> Path:
     return save_path
 
 
+def print_text_frame(string_lst, width=None):
+    if width is None:
+        width = max(len(line) for line in string_lst) + 4
+
+    g_line = "+{0}+".format("-"*(width-2))
+    print(g_line)
+    for line in string_lst:
+        print("| {0:<{1}} |".format(line, width-4))
+    print(g_line)
+
+
 def end(
     *,
     args: Args,
@@ -190,22 +201,21 @@ def end(
     empty_textures: int,
 ) -> None:
     if args.output_mode in ("progress", "debug"):
-        print("")
-        print(f"wrote {good_writes} textures to {args.output_dir.resolve()}")
-        (
-            print(f"skipped {existing_textures} existing textures")
-            if existing_textures
-            else None
-        )
+        s = [f"wrote {good_writes} textures to {args.output_dir.resolve()}"]
+
+        if existing_textures:
+            s.append(f"skipped {existing_textures} existing textures")
+
         if incomplete_textures:
-            print(f"skipped {incomplete_textures} incomplete textures")
-        (
-            print(f"{error_write_textures} incomplete/invalid textures not saved")
-            if error_write_textures
-            else None
-        )
-        print(f"skipped {empty_textures} empty textures") if empty_textures else None
-        print("")
+            s.append(f"skipped {incomplete_textures} incomplete textures")
+        if error_write_textures:
+            s.append(f"{error_write_textures} incomplete/invalid textures not saved")
+
+        if empty_textures:
+            s.append(f"skipped {empty_textures} empty textures")
+
+        print("\n")
+        print_text_frame(s)
 
 
 def main() -> None:
@@ -360,6 +370,7 @@ def main() -> None:
 
                 postfix = {
                     "ok": good_writes,
+                    "existing": existing_textures,
                     "incomplete": incomplete_textures,
                     "error": error_write_textures,
                     "empty": empty_textures,
@@ -368,15 +379,15 @@ def main() -> None:
                 progress.update()
                 progress.set_postfix({k: v for k, v in postfix.items() if v})
 
-    end(
-        args=args,
-        good_writes=good_writes,
-        incomplete_textures=incomplete_textures,
-        existing_textures=existing_textures,
-        error_write_textures=error_write_textures,
-        empty_textures=empty_textures,
-    )
+            end(
+                args=args,
+                good_writes=good_writes,
+                incomplete_textures=incomplete_textures,
+                existing_textures=existing_textures,
+                error_write_textures=error_write_textures,
+                empty_textures=empty_textures,
+            )
 
-    if args.output_mode == "files" and good_writes == 0:
-        print("warning: no textures were written")
-        sys.exit(73)
+            if args.output_mode == "files" and good_writes == 0:
+                print("warning: no textures were written")
+                sys.exit(73)
