@@ -330,53 +330,43 @@ def main() -> None:
         incomplete_textures = 0
         existing_textures = 0
 
-    def job(texture: Texture) -> Path | Exception:
-        try:
-            return save_texture(
-                texture,
-                output_dir=args.output_dir,
-                args=args,
-            )
-        except Exception as e:
-            return e
-
     with interrupthandler() as h:
         with tqdm(
             total=cache.header.entry_count,
             desc="extracting textures",
             unit="tex",
             delay=1,
-            leave=False,
             disable=args.output_mode != "progress",
         ) as progress:
-            with ThreadPoolExecutor() as executor:
-                for path_or_ex in executor.map(job, cache):
-                    if h.interrupted:
-                        progress.close()
-                        break
-                    else:
-                        progress.update()
+            for texture in cache:
+                if h.interrupted:
+                    progress.close()
+                    break
 
-                    try:
-                        if isinstance(path_or_ex, Exception):
-                            raise path_or_ex
-                        else:
-                            good_writes += 1
-                    except TextureEmptyError:
-                        empty_textures += 1
-                    except TextureIncompleteError:
-                        incomplete_textures += 1
-                    except FileExistsError:
-                        existing_textures += 1
-                    except Exception:
-                        error_write_textures += 1
+                try:
+                    save_path = save_texture(texture, output_dir=args.output_dir, args=args)
+                    good_writes += 1
 
-                    progress.set_postfix(
-                        ok=good_writes,
-                        incomplete=incomplete_textures,
-                        error=error_write_textures,
-                        empty=empty_textures,
-                    )
+                    if args.output_mode in ("files", "debug"):
+                        print(save_path.resolve())
+                except TextureEmptyError:
+                    empty_textures += 1
+                except TextureIncompleteError:
+                    incomplete_textures += 1
+                except FileExistsError:
+                    existing_textures += 1
+                except Exception:
+                    error_write_textures += 1
+
+                postfix = {
+                    "ok": good_writes,
+                    "incomplete": incomplete_textures,
+                    "error": error_write_textures,
+                    "empty": empty_textures,
+                }
+
+                progress.update()
+                progress.set_postfix({k: v for k, v in postfix.items() if v})
 
     end(
         args=args,

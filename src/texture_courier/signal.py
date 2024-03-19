@@ -29,7 +29,7 @@ class interrupthandler(ContextDecorator):
 
     def handler(self, signalnum: int, frame: FrameType | None) -> None:
         if self.immediate:
-            self.__exit__()
+            sys.exit(130)
 
         if self.interrupted:
             # called for a second time, exit immediately
