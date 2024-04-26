@@ -18,10 +18,10 @@ simple CLI program and high-level python to interact with the second life textur
 
 ## install & use
 
-install texture-courier with pip
+install texture-courier with [pipx](https://github.com/pypa/pipx)
 
 ```
-pip install texture-courier
+pipx install texture-courier
 ```
 
 then, run it on the command line like
