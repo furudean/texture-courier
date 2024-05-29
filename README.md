@@ -18,7 +18,7 @@ simple CLI program and high-level python API to interact with the second life te
 
 ## use CLI
 
-install texture-courier with pip, or if you're feeling fancy [pipx](https://github.com/pypa/pipx)
+install texture-courier with pip, or if you're feeling fancy, [pipx](https://github.com/pypa/pipx)
 
 ```
 pip install texture-courier
