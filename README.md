@@ -16,12 +16,12 @@ simple CLI program and high-level python API to interact with the second life te
 - no gui, no bells and whistles
 - no option to transform outputs into other formats, as i believe this is better covered by other programs
 
-## install & use
+## use CLI
 
-install texture-courier with [pipx](https://github.com/pypa/pipx)
+install texture-courier with pip, or if you're feeling fancy [pipx](https://github.com/pypa/pipx)
 
 ```
-pipx install texture-courier
+pip install texture-courier
 ```
 
 then, run it on the command line like
