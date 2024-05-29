@@ -2,7 +2,7 @@
 
 # texture-courier
 
-simple CLI program and high-level python to interact with the second life texture cache
+simple CLI program and high-level python API to interact with the second life texture cache
 
 ## goals
 
