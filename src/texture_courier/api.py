@@ -56,17 +56,16 @@ class Texture(Entry):
 
     def is_downloaded(self) -> bool:
         """Check if the texture file is fully downloaded"""
-        return self.fs_size() == self.image_size
+        return self.is_complete and self.fs_size() == self.cached_size
 
     def fs_size(self) -> int:
         """Get the size of the texture file on disk"""
         if self.is_empty:
             return 0
 
-        head_size = self.image_size - self.body_size
         body_size = self.body_path.stat().st_size if self.body_path.is_file() else 0
 
-        return head_size + body_size
+        return self.head_size + body_size
 
     def open_image(self) -> Image.Image:
         """Open texture as a pillow image"""
