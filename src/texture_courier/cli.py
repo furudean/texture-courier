@@ -1,14 +1,15 @@
 import argparse
-from pathlib import Path
-import sys
-from typing import Literal
-from tqdm import tqdm
 import os
+import sys
+from pathlib import Path
+from typing import Literal
 
-from .signal import interrupthandler
+from tqdm import tqdm
+
 from .api import Texture, TextureCache
 from .core import TextureCacheError
 from .find import find_texturecache, list_texture_caches
+from .signal import interrupthandler
 
 OutputMode = Literal["progress", "files", "debug"]
 
@@ -44,16 +45,16 @@ def prompt_for_cache_dir() -> Path:
         caches = list_texture_caches()
     except FileNotFoundError:
         print("error: no cache found")
-        print('try specificying a cache directory with "texture-courier <cache_dir>"')
+        print('try specifying a cache directory with "texture-courier <cache_dir>"')
         sys.exit(1)
 
     print("no cache directory specified, enter path or select from the following")
-    print("")
+    print()
 
     for i, path in enumerate(caches, start=1):
         print(f"{i}: {path.resolve()}")
 
-    print("")
+    print()
 
     with interrupthandler(immediate=True) as h:
         while not h.interrupted:
@@ -216,7 +217,7 @@ def print_text_frame(string_lst: list[str], width: int | None = None) -> None:
     if width is None:
         width = max(len(line) for line in string_lst) + 4
 
-    g_line = "+{0}+".format("-"*(width-2))
+    g_line = "+{}+".format("-"*(width-2))
     print(g_line)
     for line in string_lst:
         print("| {0:<{1}} |".format(line, width-4))
@@ -275,7 +276,7 @@ def main() -> None:
     good_writes = 0
 
     if args.output_mode == "debug":
-        print("")
+        print()
         print("TEXTURE ENTRIES HEADER:")
 
         for k, v in cache.header:
@@ -354,9 +355,9 @@ def main() -> None:
         if args.output_mode in ("progress", "debug"):
             print(f"watching for changes in {cache.cache_dir.resolve()}")
             print(f"extracting to {args.output_dir.resolve()}")
-            print("")
+            print()
             print("input ctrl+c or ctrl+d to stop")
-            print("")
+            print()
 
         with interrupthandler() as h:
             try:
@@ -385,54 +386,53 @@ def main() -> None:
         incomplete_textures = 0
         existing_textures = 0
 
-    with interrupthandler() as h:
-        with tqdm(
-            total=cache.header.entry_count,
-            desc="extracting textures",
-            unit="tex",
-            delay=1,
-            disable=args.output_mode != "progress",
-        ) as progress:
-            for texture in cache:
-                if h.interrupted:
-                    progress.close()
-                    break
+    with interrupthandler() as h, tqdm(
+        total=cache.header.entry_count,
+        desc="extracting textures",
+        unit="tex",
+        delay=1,
+        disable=args.output_mode != "progress",
+    ) as progress:
+        for texture in cache:
+            if h.interrupted:
+                progress.close()
+                break
 
-                try:
-                    save_path = save(texture, output_dir=args.output_dir, args=args)
-                    good_writes += 1
+            try:
+                save_path = save(texture, output_dir=args.output_dir, args=args)
+                good_writes += 1
 
-                    if args.output_mode in ("files", "debug"):
-                        print(save_path.resolve())
-                except TextureEmptyError:
-                    empty_textures += 1
-                except TextureIncompleteError:
-                    incomplete_textures += 1
-                except FileExistsError:
-                    existing_textures += 1
-                except Exception:
-                    error_write_textures += 1
+                if args.output_mode in ("files", "debug"):
+                    print(save_path.resolve())
+            except TextureEmptyError:
+                empty_textures += 1
+            except TextureIncompleteError:
+                incomplete_textures += 1
+            except FileExistsError:
+                existing_textures += 1
+            except Exception:
+                error_write_textures += 1
 
-                postfix = {
-                    "ok": good_writes,
-                    "existing": existing_textures,
-                    "incomplete": incomplete_textures,
-                    "error": error_write_textures,
-                    "empty": empty_textures,
-                }
+            postfix = {
+                "ok": good_writes,
+                "existing": existing_textures,
+                "incomplete": incomplete_textures,
+                "error": error_write_textures,
+                "empty": empty_textures,
+            }
 
-                progress.update()
-                progress.set_postfix({k: v for k, v in postfix.items() if v})
+            progress.update()
+            progress.set_postfix({k: v for k, v in postfix.items() if v})
 
-            end(
-                args=args,
-                good_writes=good_writes,
-                incomplete_textures=incomplete_textures,
-                existing_textures=existing_textures,
-                error_write_textures=error_write_textures,
-                empty_textures=empty_textures,
-            )
+        end(
+            args=args,
+            good_writes=good_writes,
+            incomplete_textures=incomplete_textures,
+            existing_textures=existing_textures,
+            error_write_textures=error_write_textures,
+            empty_textures=empty_textures,
+        )
 
-            if args.output_mode == "files" and good_writes == 0:
-                print("warning: no textures were written")
-                sys.exit(73)
+        if args.output_mode == "files" and good_writes == 0:
+            print("warning: no textures were written")
+            sys.exit(73)

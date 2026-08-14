@@ -48,6 +48,10 @@ see `texture-courier --help` for other options.
 i use `pip install --editable .` to install texture-courier as an editable
 package, which allows the cli to be used like it was installed from pip.
 
+[lltexturecache.h](https://github.com/secondlife/viewer/blob/develop/indra/newview/lltexturecache.h)
+is the authoritative implementation of the texture cache, which much of this implementation was
+engineered out of.
+
 ## prior art
 
 - http://slcacheviewer.com

@@ -1,6 +1,6 @@
-from pathlib import Path
 import itertools
 import os
+from pathlib import Path
 
 # pathlib does no environment expansion, so %LocalAppData% has to be looked up
 local_appdata = os.environ.get("LOCALAPPDATA")

@@ -1,28 +1,28 @@
+from collections.abc import Callable, Iterator
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional, TypeVar
-from watchdog.observers import Observer
-from watchdog.observers.api import BaseObserver
+from typing import Any, Optional, TypeVar
+
 from watchdog.events import (
-    PatternMatchingEventHandler,
     DirModifiedEvent,
     FileModifiedEvent,
+    PatternMatchingEventHandler,
 )
+from watchdog.observers import Observer
+from watchdog.observers.api import BaseObserver
 
 from .core import (
-    Header,
     Entry,
+    Header,
     Thumbnail,
-    read_fast_cache,
-    read_texture_cache,
-    read_texture_body,
-    texture_location,
     decode_texture_entries,
+    read_fast_cache,
+    read_texture_body,
+    read_texture_cache,
+    texture_location,
 )
 from .encode import encode_png, wrap_jp2
 from .util import format_bytes
-
-# based on https://github.com/secondlife/viewer/blob/develop/indra/newview/lltexturecache.h
 
 T = TypeVar("T")
 

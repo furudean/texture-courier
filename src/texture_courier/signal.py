@@ -1,8 +1,9 @@
 import signal
-from contextlib import ContextDecorator
 import sys
+from collections.abc import Callable
+from contextlib import ContextDecorator
 from types import FrameType
-from typing import Any, Callable, Self, TypeAlias
+from typing import Any, Self, TypeAlias
 
 Handlers: TypeAlias = Callable[[int, FrameType | None], Any] | int | None
 

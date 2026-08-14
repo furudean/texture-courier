@@ -1,9 +1,10 @@
+import struct
+from collections.abc import Iterator
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-import struct
+from typing import Any, Self
 from uuid import UUID
-from typing import Any, Iterator, Self
 
 from .util import format_bytes
 
