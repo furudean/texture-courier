@@ -1,12 +1,12 @@
 import struct
 
-from hypothesis import given, settings, strategies as st
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
+from spec import decode_png, iter_chunks
 
 from texture_courier.core import TextureCacheError
 from texture_courier.encode import encode_png
-
-from spec import decode_png, iter_chunks
 
 
 def rows(width: int, height: int, components: int) -> list[bytes]:

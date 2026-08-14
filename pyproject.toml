@@ -15,10 +15,10 @@ dependencies = [
  "watchdog>=3",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
+  "ruff>=0.16.3",
   "mypy>=1",
-  "flake8>=6",
   "pytest>=8",
   "hypothesis>=6",
   "types-setuptools",
@@ -44,3 +44,7 @@ python_version = "3.11"
 exclude = ["build", "dist"]
 strict = true
 untyped_calls_exclude = ["watchdog"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120

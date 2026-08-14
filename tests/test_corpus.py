@@ -1,11 +1,10 @@
 import pytest
+from conftest import sample_textures
+from spec import boxes, decode_png, parse_ihdr
 
 from texture_courier.api import Texture, TextureCache
 from texture_courier.core import Thumbnail
 from texture_courier.encode import codestream_size, wrap_jp2
-
-from conftest import sample_textures
-from spec import boxes, decode_png, parse_ihdr
 
 SAMPLES = sample_textures()
 

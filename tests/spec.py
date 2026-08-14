@@ -5,10 +5,10 @@ that parses with the same code that wrote has only proved that the code agrees
 with itself.
 """
 
-from dataclasses import dataclass
 import struct
 import zlib
-from typing import Iterator
+from collections.abc import Iterator
+from dataclasses import dataclass
 
 SOC_MARKER = b"\xff\x4f"
 SIZ_MARKER = b"\xff\x51"
@@ -74,14 +74,14 @@ def iter_boxes(b: bytes) -> Iterator[Box]:
         if remaining < 8:
             raise ValueError(f"{remaining} bytes left over, too few for a box header")
 
-        length, kind = struct.unpack(">I4s", b[offset:offset + 8])
+        length, kind = struct.unpack(">I4s", b[offset : offset + 8])
 
         # a length of 0 means the box runs to the end of the file and 1 means a
         # 64 bit length follows. the encoder emits neither
         if length < 8 or length > remaining:
             raise ValueError(f"box {kind!r} declares {length} bytes, {remaining} remain")
 
-        yield Box(kind, b[offset + 8:offset + length])
+        yield Box(kind, b[offset + 8 : offset + length])
 
         offset += length
 
@@ -124,7 +124,7 @@ def parse_cdef(payload: bytes) -> dict[int, tuple[int, int]]:
 
     for i in range(count):
         start = 2 + i * 6
-        channel, kind, association = struct.unpack(">HHH", payload[start:start + 6])
+        channel, kind, association = struct.unpack(">HHH", payload[start : start + 6])
         channels[channel] = (kind, association)
 
     return channels
@@ -147,9 +147,9 @@ def iter_chunks(b: bytes) -> Iterator[Chunk]:
         if len(b) - offset < 8:
             raise ValueError(f"{len(b) - offset} bytes left over, too few for a chunk header")
 
-        length, kind = struct.unpack(">I4s", b[offset:offset + 8])
-        payload = b[offset + 8:offset + 8 + length]
-        checksum = b[offset + 8 + length:offset + 12 + length]
+        length, kind = struct.unpack(">I4s", b[offset : offset + 8])
+        payload = b[offset + 8 : offset + 8 + length]
+        checksum = b[offset + 8 + length : offset + 12 + length]
 
         if len(payload) != length or len(checksum) != 4:
             raise ValueError(f"chunk {kind!r} runs past the end of the file")
@@ -206,6 +206,6 @@ def decode_png(b: bytes) -> Png:
         if data[start] != 0:
             raise ValueError(f"row {y} uses filter {data[start]}")
 
-        rows.append(data[start + 1:start + 1 + stride])
+        rows.append(data[start + 1 : start + 1 + stride])
 
     return Png(width, height, components, tuple(rows))

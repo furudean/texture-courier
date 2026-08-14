@@ -93,9 +93,7 @@ def parse_args() -> Args:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
-    parser.add_argument(
-        "cache_dir", type=Path, nargs="?", help="path to texture cache directory"
-    )
+    parser.add_argument("cache_dir", type=Path, nargs="?", help="path to texture cache directory")
     parser.add_argument(
         "--output-dir",
         "-o",
@@ -217,10 +215,10 @@ def print_text_frame(string_lst: list[str], width: int | None = None) -> None:
     if width is None:
         width = max(len(line) for line in string_lst) + 4
 
-    g_line = "+{}+".format("-"*(width-2))
+    g_line = "+{}+".format("-" * (width - 2))
     print(g_line)
     for line in string_lst:
-        print("| {0:<{1}} |".format(line, width-4))
+        print("| {0:<{1}} |".format(line, width - 4))
     print(g_line)
 
 
@@ -386,13 +384,16 @@ def main() -> None:
         incomplete_textures = 0
         existing_textures = 0
 
-    with interrupthandler() as h, tqdm(
-        total=cache.header.entry_count,
-        desc="extracting textures",
-        unit="tex",
-        delay=1,
-        disable=args.output_mode != "progress",
-    ) as progress:
+    with (
+        interrupthandler() as h,
+        tqdm(
+            total=cache.header.entry_count,
+            desc="extracting textures",
+            unit="tex",
+            delay=1,
+            disable=args.output_mode != "progress",
+        ) as progress,
+    ):
         for texture in cache:
             if h.interrupted:
                 progress.close()

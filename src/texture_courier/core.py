@@ -60,9 +60,7 @@ class Header:
         raw = texture_entries.read(HEADER_BYTE_COUNT)
 
         if len(raw) != HEADER_BYTE_COUNT:
-            raise TextureCacheError(
-                "texture.entries is too small to hold a header"
-            )
+            raise TextureCacheError("texture.entries is too small to hold a header")
 
         unpack = struct.unpack(HEADER_STRUCT_FORMAT, raw)
 
@@ -78,8 +76,7 @@ class Header:
 
         if actual != expected:
             raise TextureCacheError(
-                f"texture.entries is {actual} bytes, expected {expected} for "
-                f"{header.entry_count} entries"
+                f"texture.entries is {actual} bytes, expected {expected} for {header.entry_count} entries"
             )
 
         return header
@@ -169,10 +166,7 @@ class Thumbnail:
         self.pixels = pixels
 
     def __repr__(self) -> str:
-        return (
-            f"<Thumbnail {self.width}x{self.height}, "
-            f"{self.components} components, discard {self.discard_level}>"
-        )
+        return f"<Thumbnail {self.width}x{self.height}, {self.components} components, discard {self.discard_level}>"
 
     @property
     def size(self) -> tuple[int, int]:
@@ -188,12 +182,7 @@ class Thumbnail:
         # a slot that cannot describe an image was never written to. the
         # thumbnails are not all 16x16, tall and narrow textures keep their
         # aspect ratio, so only the total has to fit
-        if (
-            width <= 0
-            or height <= 0
-            or not 0 < components <= 4
-            or pixel_count > FAST_CACHE_DATA_BYTE_COUNT
-        ):
+        if width <= 0 or height <= 0 or not 0 < components <= 4 or pixel_count > FAST_CACHE_DATA_BYTE_COUNT:
             return None
 
         # unlike texture.cache, the rest of the slot is not zeroed, it is
@@ -217,8 +206,7 @@ def read_fast_cache(fast_cache: BytesIO, n: int) -> Thumbnail | None:
 
     if len(raw) != FAST_CACHE_BYTE_COUNT:
         raise TextureCacheError(
-            f"failed to read from fast cache at {offset}, "
-            f"got {len(raw)} of {FAST_CACHE_BYTE_COUNT} bytes"
+            f"failed to read from fast cache at {offset}, got {len(raw)} of {FAST_CACHE_BYTE_COUNT} bytes"
         )
 
     return Thumbnail.from_bytes(raw)
@@ -237,9 +225,7 @@ def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[E
         entries.append(Entry.from_bytes(entry_bytes))
 
     if len(entries) != entry_count:
-        raise TextureCacheError(
-            f"number of read entries {len(entries)} does not match declared count {entry_count}"
-        )
+        raise TextureCacheError(f"number of read entries {len(entries)} does not match declared count {entry_count}")
 
     return entries
 
@@ -255,8 +241,7 @@ def read_texture_cache(texture_cache: BytesIO, n: int) -> bytes:
 
     if len(head) != TEXTURE_CACHE_BYTE_COUNT:
         raise TextureCacheError(
-            f"failed to read from texture cache at {offset}, "
-            f"got {len(head)} of {TEXTURE_CACHE_BYTE_COUNT} bytes"
+            f"failed to read from texture cache at {offset}, got {len(head)} of {TEXTURE_CACHE_BYTE_COUNT} bytes"
         )
 
     return head

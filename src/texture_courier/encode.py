@@ -36,9 +36,7 @@ def codestream_size(codestream: bytes) -> tuple[int, int, int, int]:
         raise TextureCacheError("not a jpeg2000 codestream")
 
     if len(codestream) < SIZ_BYTE_COUNT:
-        raise TextureCacheError(
-            f"codestream is {len(codestream)} bytes, too short to hold a SIZ marker"
-        )
+        raise TextureCacheError(f"codestream is {len(codestream)} bytes, too short to hold a SIZ marker")
 
     xsiz, ysiz, xosiz, yosiz = struct.unpack(">4I", codestream[8:24])
     components = struct.unpack(">H", codestream[40:42])[0]
@@ -88,27 +86,19 @@ def wrap_jp2(codestream: bytes) -> bytes:
     if components > color_channels:
         # the colour space does not account for every channel, so a channel
         # definition box has to say what the rest are
-        channels = [
-            struct.pack(">HHH", channel, CDEF_TYPE_COLOR, channel + 1)
-            for channel in range(color_channels)
-        ]
+        channels = [struct.pack(">HHH", channel, CDEF_TYPE_COLOR, channel + 1) for channel in range(color_channels)]
 
         if components == color_channels + 1:
             # one channel over is alpha, and nothing marks it as such without
             # this. any more than that and there is no telling, so leave them
             # unspecified rather than invent a meaning for them
-            channels.append(
-                struct.pack(">HHH", components - 1, CDEF_TYPE_OPACITY, 0)
-            )
+            channels.append(struct.pack(">HHH", components - 1, CDEF_TYPE_OPACITY, 0))
         else:
             channels += [
-                struct.pack(">HHH", channel, CDEF_TYPE_UNSPECIFIED, 0)
-                for channel in range(color_channels, components)
+                struct.pack(">HHH", channel, CDEF_TYPE_UNSPECIFIED, 0) for channel in range(color_channels, components)
             ]
 
-        header += jp2_box(
-            b"cdef", struct.pack(">H", components) + b"".join(channels)
-        )
+        header += jp2_box(b"cdef", struct.pack(">H", components) + b"".join(channels))
 
     return (
         JP2_SIGNATURE
@@ -119,12 +109,7 @@ def wrap_jp2(codestream: bytes) -> bytes:
 
 
 def png_chunk(kind: bytes, payload: bytes) -> bytes:
-    return (
-        struct.pack(">I", len(payload))
-        + kind
-        + payload
-        + struct.pack(">I", zlib.crc32(kind + payload))
-    )
+    return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload))
 
 
 def encode_png(width: int, height: int, components: int, pixels: bytes) -> bytes:
@@ -136,8 +121,7 @@ def encode_png(width: int, height: int, components: int, pixels: bytes) -> bytes
 
     if len(pixels) != expected:
         raise TextureCacheError(
-            f"got {len(pixels)} pixel bytes, expected {expected} "
-            f"for {width}x{height} in {components} components"
+            f"got {len(pixels)} pixel bytes, expected {expected} for {width}x{height} in {components} components"
         )
 
     stride = width * components
@@ -146,15 +130,13 @@ def encode_png(width: int, height: int, components: int, pixels: bytes) -> bytes
     # png rows run top down and each is prefixed with its filter type
     for row in reversed(range(height)):
         start = row * stride
-        scanlines.append(b"\x00" + pixels[start:start + stride])
+        scanlines.append(b"\x00" + pixels[start : start + stride])
 
     return (
         PNG_SIGNATURE
         + png_chunk(
             b"IHDR",
-            struct.pack(
-                ">IIBBBBB", width, height, 8, PNG_COLOR_TYPES[components], 0, 0, 0
-            ),
+            struct.pack(">IIBBBBB", width, height, 8, PNG_COLOR_TYPES[components], 0, 0, 0),
         )
         + png_chunk(b"IDAT", zlib.compress(b"".join(scanlines), 9))
         + png_chunk(b"IEND", b"")

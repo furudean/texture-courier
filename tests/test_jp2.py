@@ -1,7 +1,9 @@
 import struct
 
-from hypothesis import given, strategies as st
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+from spec import JP2_SIGNATURE, boxes, codestream, iter_boxes, parse_cdef, parse_colr, parse_ihdr
 
 from texture_courier.core import TextureCacheError
 from texture_courier.encode import (
@@ -12,8 +14,6 @@ from texture_courier.encode import (
     ENUM_CS_SRGB,
     wrap_jp2,
 )
-
-from spec import JP2_SIGNATURE, boxes, codestream, iter_boxes, parse_cdef, parse_colr, parse_ihdr
 
 
 def jp2h(jp2: bytes) -> dict[bytes, bytes]:
@@ -147,9 +147,7 @@ def test_rejects_zero_components() -> None:
     components=st.integers(min_value=1, max_value=16),
     bit_depth=st.integers(min_value=1, max_value=38),
 )
-def test_any_codestream_wraps_into_a_readable_file(
-    width: int, height: int, components: int, bit_depth: int
-) -> None:
+def test_any_codestream_wraps_into_a_readable_file(width: int, height: int, components: int, bit_depth: int) -> None:
     original = codestream(width=width, height=height, components=components, bit_depth=bit_depth)
     jp2 = wrap_jp2(original)
 

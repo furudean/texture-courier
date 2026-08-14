@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterator
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Optional, TypeVar
+from typing import Any, TypeVar
 
 from watchdog.events import (
     DirModifiedEvent,
@@ -89,9 +89,7 @@ class Texture(Entry):
         if thumbnail is None:
             return None
 
-        return encode_png(
-            thumbnail.width, thumbnail.height, thumbnail.components, thumbnail.pixels
-        )
+        return encode_png(thumbnail.width, thumbnail.height, thumbnail.components, thumbnail.pixels)
 
 
 class TextureCache:
@@ -134,9 +132,7 @@ class TextureCache:
         total_size = sum(texture.image_size for texture in self)
 
         return (
-            f"<TextureCache {self.cache_dir.resolve()}, "
-            f"{self.header.entry_count} entries, "
-            f"{format_bytes(total_size)}>"
+            f"<TextureCache {self.cache_dir.resolve()}, {self.header.entry_count} entries, {format_bytes(total_size)}>"
         )
 
     def __get_read_bytes(self, i: int, entry: Entry) -> Callable[[], bytes]:
@@ -171,9 +167,7 @@ class TextureCache:
         self.header = Header.from_texture_entries(self.texture_entries_file)
 
         fast_cache_path = self.cache_dir / "FastCache.cache"
-        self.fast_cache_file = (
-            loads_bytes_io(fast_cache_path) if fast_cache_path.is_file() else None
-        )
+        self.fast_cache_file = loads_bytes_io(fast_cache_path) if fast_cache_path.is_file() else None
 
         self.entries = decode_texture_entries(
             self.texture_entries_file,
@@ -218,5 +212,5 @@ class TextureCache:
 
         return observer
 
-    def get(self, uuid: str, default: Optional[T] = None) -> Texture | T:
+    def get(self, uuid: str, default: T | None = None) -> Texture | T:
         return self.textures.get(uuid, default)  # type: ignore

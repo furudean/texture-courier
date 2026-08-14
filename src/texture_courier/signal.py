@@ -22,7 +22,7 @@ class interrupthandler(ContextDecorator):
 
         return self
 
-    def __exit__(self, *exc: Any) -> None:
+    def __exit__(self, *exc: object) -> None:
         signal.signal(signal.SIGINT, self.original_sigint_handler)
 
         if self.interrupted:
