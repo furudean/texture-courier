@@ -32,6 +32,7 @@ class Args(argparse.Namespace):
     force: bool
     raw: bool
     skip_integrity: bool
+    thumb: bool
 
 
 def clear_screen() -> None:
@@ -126,7 +127,9 @@ def parse_args() -> Args:
         default=False,
     )
 
-    parser.add_argument(
+    output_format = parser.add_mutually_exclusive_group()
+
+    output_format.add_argument(
         "--raw",
         action="store_true",
         help="skip encoding and just save the raw codestream",
@@ -137,6 +140,13 @@ def parse_args() -> Args:
         "--skip-integrity",
         action="store_true",
         help="skip integrity checks",
+        default=False,
+    )
+
+    output_format.add_argument(
+        "--thumb",
+        action="store_true",
+        help="dump thumbnails instead of textures. these are tiny, but exist for partial downloads.",
         default=False,
     )
 
@@ -175,6 +185,30 @@ def save_texture(texture: Texture, output_dir: Path, args: Args) -> Path:
 
     # set last access and modification times to the same as the date in cache
     # (atime, mtime)
+    os.utime(save_path, (texture.time.timestamp(), texture.time.timestamp()))
+
+    return save_path
+
+
+def save_thumbnail(texture: Texture, output_dir: Path, args: Args) -> Path:
+    # deliberately not gated on is_downloaded, a thumbnail is the only picture
+    # of a texture the viewer never finished fetching
+    if texture.is_empty:
+        raise TextureEmptyError
+
+    save_path = output_dir / f"{texture.uuid}.png"
+
+    if save_path.exists() and not args.force:
+        raise FileExistsError
+
+    image = texture.open_thumbnail()
+
+    if image is None:
+        raise TextureEmptyError
+
+    with image:
+        image.save(save_path)
+
     os.utime(save_path, (texture.time.timestamp(), texture.time.timestamp()))
 
     return save_path
@@ -251,6 +285,12 @@ def main() -> None:
 
     args.output_dir.mkdir(exist_ok=True)
 
+    if args.thumb and cache.fast_cache_file is None:
+        print("error: this cache has no FastCache.cache to read thumbnails from")
+        sys.exit(1)
+
+    save = save_thumbnail if args.thumb else save_texture
+
     if args.watch:
         incomplete_stack: set[str] = set()
         failed_stack: set[str] = set()
@@ -264,7 +304,7 @@ def main() -> None:
                 save_path: Path | None = None
 
                 try:
-                    save_path = save_texture(
+                    save_path = save(
                         texture,
                         output_dir=args.output_dir,
                         args=args,
@@ -361,7 +401,7 @@ def main() -> None:
                     break
 
                 try:
-                    save_path = save_texture(texture, output_dir=args.output_dir, args=args)
+                    save_path = save(texture, output_dir=args.output_dir, args=args)
                     good_writes += 1
 
                     if args.output_mode in ("files", "debug"):

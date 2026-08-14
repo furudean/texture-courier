@@ -15,6 +15,16 @@ ENTRY_BYTE_COUNT = 28
 
 TEXTURE_CACHE_BYTE_COUNT = 600
 
+# FastCache.cache holds one downscaled raw thumbnail per entry
+# lltexturecache.cpp:
+# `const S32 TEXTURE_FAST_CACHE_ENTRY_OVERHEAD = sizeof(S32) * 4; //w, h, c, level`
+# `const S32 TEXTURE_FAST_CACHE_DATA_SIZE = 16 * 16 * 4;`
+FAST_CACHE_STRUCT_FORMAT = "4i"
+FAST_CACHE_HEADER_BYTE_COUNT = 16
+FAST_CACHE_DATA_BYTE_COUNT = 16 * 16 * 4
+FAST_CACHE_BYTE_COUNT = FAST_CACHE_HEADER_BYTE_COUNT + FAST_CACHE_DATA_BYTE_COUNT
+
+
 class TextureCacheError(Exception):
     """Cache not laid out the way this program expects"""
 
@@ -133,6 +143,84 @@ class Entry:
             body_size=rest[1],
             time=datetime.fromtimestamp(rest[2]),
         )
+
+
+class Thumbnail:
+    width: int
+    height: int
+    components: int
+    discard_level: int
+    pixels: bytes
+    """Raw pixel rows, bottom up, as the viewer hands them to GL"""
+
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        components: int,
+        discard_level: int,
+        pixels: bytes,
+    ):
+        self.width = width
+        self.height = height
+        self.components = components
+        self.discard_level = discard_level
+        self.pixels = pixels
+
+    def __repr__(self) -> str:
+        return (
+            f"<Thumbnail {self.width}x{self.height}, "
+            f"{self.components} components, discard {self.discard_level}>"
+        )
+
+    @property
+    def size(self) -> tuple[int, int]:
+        return self.width, self.height
+
+    @classmethod
+    def from_bytes(cls, b: bytes) -> Self | None:
+        width, height, components, discard_level = struct.unpack(
+            FAST_CACHE_STRUCT_FORMAT, b[:FAST_CACHE_HEADER_BYTE_COUNT]
+        )
+        pixel_count = width * height * components
+
+        # a slot that cannot describe an image was never written to. the
+        # thumbnails are not all 16x16, tall and narrow textures keep their
+        # aspect ratio, so only the total has to fit
+        if (
+            width <= 0
+            or height <= 0
+            or not 0 < components <= 4
+            or pixel_count > FAST_CACHE_DATA_BYTE_COUNT
+        ):
+            return None
+
+        # unlike texture.cache, the rest of the slot is not zeroed, it is
+        # whatever the previous occupant left behind
+        end = FAST_CACHE_HEADER_BYTE_COUNT + pixel_count
+
+        return cls(
+            width=width,
+            height=height,
+            components=components,
+            discard_level=discard_level,
+            pixels=b[FAST_CACHE_HEADER_BYTE_COUNT:end],
+        )
+
+
+def read_fast_cache(fast_cache: BytesIO, n: int) -> Thumbnail | None:
+    offset = FAST_CACHE_BYTE_COUNT * n
+
+    fast_cache.seek(offset)
+    raw = fast_cache.read(FAST_CACHE_BYTE_COUNT)
+
+    if len(raw) != FAST_CACHE_BYTE_COUNT:
+        raise TextureCacheError(
+            f"failed to read from fast cache at {offset}, "
+            f"got {len(raw)} of {FAST_CACHE_BYTE_COUNT} bytes"
+        )
+
+    return Thumbnail.from_bytes(raw)
 
 
 def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[Entry]:

@@ -12,6 +12,8 @@ from watchdog.events import (
 from .core import (
     Header,
     Entry,
+    Thumbnail,
+    read_fast_cache,
     read_texture_cache,
     read_texture_body,
     texture_location,
@@ -25,6 +27,8 @@ from PIL import Image
 
 T = TypeVar("T")
 
+THUMBNAIL_MODES = {1: "L", 2: "LA", 3: "RGB", 4: "RGBA"}
+
 
 def loads_bytes_io(p: Path) -> BytesIO:
     return BytesIO(p.read_bytes())
@@ -35,6 +39,8 @@ class Texture(Entry):
     body_path: Path
     loads: Callable[[], bytes]
     """Open texture as a bytes object"""
+    loads_thumbnail: Callable[[], Thumbnail | None]
+    """Read this texture's fast cache thumbnail, if there is one"""
 
     def __init__(
         self,
@@ -43,12 +49,14 @@ class Texture(Entry):
         entry: Entry,
         body_path: Path,
         loads: Callable[[], bytes],
+        loads_thumbnail: Callable[[], Thumbnail | None],
     ):
         super().__init__(**entry.__dict__)
 
         self.index = index
         self.body_path = body_path
         self.loads = loads
+        self.loads_thumbnail = loads_thumbnail
 
     def __repr__(self) -> str:
         size = format_bytes(self.image_size) if not self.is_empty else "empty"
@@ -73,11 +81,28 @@ class Texture(Entry):
         b = self.loads()
         return Image.open(BytesIO(b), formats=["jpeg2000"])
 
+    def open_thumbnail(self) -> Image.Image | None:
+        """Open the fast cache thumbnail as a pillow image"""
+
+        thumbnail = self.loads_thumbnail()
+
+        if thumbnail is None:
+            return None
+
+        image = Image.frombytes(
+            THUMBNAIL_MODES[thumbnail.components], thumbnail.size, thumbnail.pixels
+        )
+
+        # rows are stored bottom up, so the image comes out upside down
+        return image.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+
 
 class TextureCache:
     cache_dir: Path
     texture_entries_file: BytesIO
     texture_cache_file: BytesIO
+    fast_cache_file: BytesIO | None
+    """FastCache.cache, absent on caches written before it existed"""
 
     header: Header
     entries: list[Entry]
@@ -132,12 +157,26 @@ class TextureCache:
 
         return read_bytes
 
+    def __get_read_thumbnail(self, i: int) -> Callable[[], Thumbnail | None]:
+        def read_thumbnail() -> Thumbnail | None:
+            if self.fast_cache_file is None:
+                return None
+
+            return read_fast_cache(self.fast_cache_file, i)
+
+        return read_thumbnail
+
     def refresh(self) -> Iterator[Texture]:
         old_entry_count = self.header.entry_count if hasattr(self, "header") else 0
 
         self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
         self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
         self.header = Header.from_texture_entries(self.texture_entries_file)
+
+        fast_cache_path = self.cache_dir / "FastCache.cache"
+        self.fast_cache_file = (
+            loads_bytes_io(fast_cache_path) if fast_cache_path.is_file() else None
+        )
 
         self.entries = decode_texture_entries(
             self.texture_entries_file,
@@ -156,6 +195,7 @@ class TextureCache:
                     index=i,
                     entry=entry,
                     loads=self.__get_read_bytes(i, entry),
+                    loads_thumbnail=self.__get_read_thumbnail(i),
                     body_path=texture_location(self.cache_dir, entry.uuid),
                 )
 
@@ -173,7 +213,7 @@ class TextureCache:
                 handler(changed_textures)
 
         event_handler = PatternMatchingEventHandler(patterns=["texture.entries"])
-        event_handler.on_modified = on_modified
+        event_handler.on_modified = on_modified  # type: ignore[method-assign]
 
         observer = Observer()
         observer.schedule(event_handler, str(self.cache_dir.resolve()))
