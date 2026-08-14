@@ -275,7 +275,9 @@ def main() -> None:
                     failed_stack.discard(texture.uuid)
                 except TextureIncompleteError:
                     incomplete_stack.add(texture.uuid)
-                except OSError as e:
+                except Exception as e:
+                    # a texture the viewer is midway through writing shouldn't
+                    # take the observer thread down with it
                     failed_stack.add(texture.uuid)
 
                     if args.output_mode == "debug":

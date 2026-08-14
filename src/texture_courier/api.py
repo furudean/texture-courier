@@ -80,11 +80,15 @@ class TextureCache:
     texture_cache_file: BytesIO
 
     header: Header
-    entries: list[Entry] = []
-    textures: dict[str, Texture] = {}
+    entries: list[Entry]
+    textures: dict[str, Texture]
 
     def __init__(self, cache_dir: str | Path):
         self.cache_dir = Path(cache_dir)
+        # these are per instance, a class level default would be shared by
+        # every cache in the process
+        self.entries = []
+        self.textures = {}
 
         if (
             not self.cache_dir.is_dir()

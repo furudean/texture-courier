@@ -1,11 +1,15 @@
 from pathlib import Path
 import itertools
+import os
+
+# pathlib does no environment expansion, so %LocalAppData% has to be looked up
+local_appdata = os.environ.get("LOCALAPPDATA")
 
 os_cache_roots = [
     # posix
     Path.home(),
     # windows
-    Path(r"%LocalAppData%"),
+    *([Path(local_appdata)] if local_appdata else []),
     # mac
     Path.home() / "Library/Caches",
 ]
@@ -24,10 +28,15 @@ def find_texturecache(path: Path) -> Path | None:
     if path.name == "texturecache" and (path / "texture.entries").exists():
         return path
 
-    # otherwise, recurse into the children with some possible names
+    # otherwise, recurse into the children with some possible names. windows
+    # and linux keep the cache one level further down, under "cache"
     for child in path.iterdir():
-        if child.is_dir() and child.name == "texturecache":
-            return find_texturecache(child)
+        if child.is_dir() and child.name in ("texturecache", "cache"):
+            found = find_texturecache(child)
+
+            # keep looking through the other children rather than giving up
+            if found is not None:
+                return found
 
     return None
 

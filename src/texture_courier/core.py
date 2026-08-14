@@ -136,13 +136,21 @@ def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[E
 
 
 def read_texture_cache(texture_cache: BytesIO, n: int) -> bytes:
-    try:
-        texture_cache.seek(TEXTURE_CACHE_BYTE_COUNT * n)
-        return texture_cache.read(TEXTURE_CACHE_BYTE_COUNT)
-    except OSError:
+    offset = TEXTURE_CACHE_BYTE_COUNT * n
+
+    # seeking past the end of a BytesIO is legal and reads back short rather
+    # than raising, so the length is what has to be checked. texture.cache
+    # lagging behind texture.entries is normal while a viewer is running
+    texture_cache.seek(offset)
+    head = texture_cache.read(TEXTURE_CACHE_BYTE_COUNT)
+
+    if len(head) != TEXTURE_CACHE_BYTE_COUNT:
         raise Exception(
-            f"failed to read from texture cache at {TEXTURE_CACHE_BYTE_COUNT * n}"
+            f"failed to read from texture cache at {offset}, "
+            f"got {len(head)} of {TEXTURE_CACHE_BYTE_COUNT} bytes"
         )
+
+    return head
 
 
 def texture_location(cache_dir: Path, uuid: str) -> Path:
