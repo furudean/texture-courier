@@ -139,7 +139,7 @@ class Entry:
             uuid=uuid,
             image_size=rest[0],
             body_size=rest[1],
-            time=datetime.fromtimestamp(rest[2]),
+            time=datetime.fromtimestamp(rest[2]),  # noqa: DTZ006
         )
 
 

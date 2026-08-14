@@ -318,7 +318,7 @@ def main() -> None:
                     failed_stack.discard(texture.uuid)
                 except TextureIncompleteError:
                     incomplete_stack.add(texture.uuid)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     # a texture the viewer is midway through writing shouldn't
                     # take the observer thread down with it
                     failed_stack.add(texture.uuid)
@@ -411,7 +411,7 @@ def main() -> None:
                 incomplete_textures += 1
             except FileExistsError:
                 existing_textures += 1
-            except Exception:
+            except Exception:  # noqa: BLE001
                 error_write_textures += 1
 
             postfix = {
