@@ -19,6 +19,8 @@ dependencies = [
 dev = [
   "mypy>=1",
   "flake8>=6",
+  "pytest>=8",
+  "hypothesis>=6",
   "types-setuptools",
   "types-tqdm>=4",
 ]
@@ -33,6 +35,9 @@ build-backend = "setuptools.build_meta"
 
 [project.scripts]
 texture-courier = "texture_courier:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.mypy]
 python_version = "3.11"

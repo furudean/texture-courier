@@ -31,3 +31,6 @@ jobs:
     - name: Typecheck with mypy
       run: |
         mypy .
+    - name: Test with pytest
+      run: |
+        pytest
