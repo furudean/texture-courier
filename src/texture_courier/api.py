@@ -19,15 +19,12 @@ from .core import (
     texture_location,
     decode_texture_entries,
 )
+from .encode import encode_png, wrap_jp2
 from .util import format_bytes
-
-from PIL import Image
 
 # based on https://github.com/secondlife/viewer/blob/develop/indra/newview/lltexturecache.h
 
 T = TypeVar("T")
-
-THUMBNAIL_MODES = {1: "L", 2: "LA", 3: "RGB", 4: "RGBA"}
 
 
 def loads_bytes_io(p: Path) -> BytesIO:
@@ -75,26 +72,26 @@ class Texture(Entry):
 
         return self.head_size + body_size
 
-    def open_image(self) -> Image.Image:
-        """Open texture as a pillow image"""
+    def loads_jp2(self) -> bytes:
+        """Put the texture in a jp2 container without decoding it
 
-        b = self.loads()
-        return Image.open(BytesIO(b), formats=["jpeg2000"])
+        The cache holds a bare codestream, which most software will not open.
+        A jp2 is that same codestream in a few bytes of boxes, so this costs
+        very little to do.
+        """
+        return wrap_jp2(self.loads())
 
-    def open_thumbnail(self) -> Image.Image | None:
-        """Open the fast cache thumbnail as a pillow image"""
+    def loads_thumbnail_png(self) -> bytes | None:
+        """Encode the fast cache thumbnail as a png"""
 
         thumbnail = self.loads_thumbnail()
 
         if thumbnail is None:
             return None
 
-        image = Image.frombytes(
-            THUMBNAIL_MODES[thumbnail.components], thumbnail.size, thumbnail.pixels
+        return encode_png(
+            thumbnail.width, thumbnail.height, thumbnail.components, thumbnail.pixels
         )
-
-        # rows are stored bottom up, so the image comes out upside down
-        return image.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
 
 class TextureCache:

@@ -171,10 +171,9 @@ def save_texture(texture: Texture, output_dir: Path, args: Args) -> Path:
 
         # the cache stores textures in a raw jpeg2000 codestream format
         # that is hard for most operating systems to read, which isn't
-        # intended to be used for storage. loading it with pillow puts
-        # it in a proper container format
-        with texture.open_image() as im:
-            im.save(save_path)
+        # intended to be used for storage. wrapping it in a jp2 container
+        # fixes that without touching the codestream itself
+        save_path.write_bytes(texture.loads_jp2())
     else:
         save_path = output_dir / f"{texture.uuid}.j2c"
 
@@ -201,13 +200,12 @@ def save_thumbnail(texture: Texture, output_dir: Path, args: Args) -> Path:
     if save_path.exists() and not args.force:
         raise FileExistsError
 
-    image = texture.open_thumbnail()
+    png = texture.loads_thumbnail_png()
 
-    if image is None:
+    if png is None:
         raise TextureEmptyError
 
-    with image:
-        image.save(save_path)
+    save_path.write_bytes(png)
 
     os.utime(save_path, (texture.time.timestamp(), texture.time.timestamp()))
 
