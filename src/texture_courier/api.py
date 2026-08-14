@@ -173,7 +173,7 @@ class TextureCache:
                 handler(changed_textures)
 
         event_handler = PatternMatchingEventHandler(patterns=["texture.entries"])
-        setattr(event_handler, "on_modified", on_modified)
+        event_handler.on_modified = on_modified
 
         observer = Observer()
         observer.schedule(event_handler, str(self.cache_dir.resolve()))

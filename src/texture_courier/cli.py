@@ -7,6 +7,7 @@ import os
 
 from .signal import interrupthandler
 from .api import Texture, TextureCache
+from .core import TextureCacheError
 from .find import find_texturecache, list_texture_caches
 
 OutputMode = Literal["progress", "files", "debug"]
@@ -233,7 +234,12 @@ def main() -> None:
 
         cache_dir = prompt_for_cache_dir()
 
-    cache = TextureCache(cache_dir)
+    try:
+        cache = TextureCache(cache_dir)
+    except TextureCacheError as e:
+        print(f"error: {e}")
+        sys.exit(1)
+
     good_writes = 0
 
     if args.output_mode == "debug":

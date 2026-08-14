@@ -15,6 +15,9 @@ ENTRY_BYTE_COUNT = 28
 
 TEXTURE_CACHE_BYTE_COUNT = 600
 
+class TextureCacheError(Exception):
+    """Cache not laid out the way this program expects"""
+
 
 class Header:
     version: str
@@ -43,15 +46,32 @@ class Header:
     @classmethod
     def from_texture_entries(cls, texture_entries: BytesIO) -> Self:
         texture_entries.seek(0)
-        header = texture_entries.read(HEADER_BYTE_COUNT)
-        unpack = struct.unpack(HEADER_STRUCT_FORMAT, header)
+        raw = texture_entries.read(HEADER_BYTE_COUNT)
 
-        return cls(
-            version="%0.2f" % unpack[0],
+        if len(raw) != HEADER_BYTE_COUNT:
+            raise TextureCacheError(
+                "texture.entries is too small to hold a header"
+            )
+
+        unpack = struct.unpack(HEADER_STRUCT_FORMAT, raw)
+
+        header = cls(
+            version=f"{unpack[0]:0.2f}",
             address_size=unpack[1],
             encoder=unpack[2].decode("utf-8").replace("\x00", ""),
             entry_count=unpack[3],
         )
+
+        expected = HEADER_BYTE_COUNT + header.entry_count * ENTRY_BYTE_COUNT
+        actual = texture_entries.getbuffer().nbytes
+
+        if actual != expected:
+            raise TextureCacheError(
+                f"texture.entries is {actual} bytes, expected {expected} for "
+                f"{header.entry_count} entries"
+            )
+
+        return header
 
 
 class Entry:
@@ -123,12 +143,12 @@ def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[E
         entry_bytes = texture_entries.read(ENTRY_BYTE_COUNT)
 
         if len(entry_bytes) != ENTRY_BYTE_COUNT:
-            raise Exception(f"failed to read entry at {texture_entries.tell()}")
+            raise TextureCacheError(f"failed to read entry at {texture_entries.tell()}")
 
         entries.append(Entry.from_bytes(entry_bytes))
 
     if len(entries) != entry_count:
-        raise Exception(
+        raise TextureCacheError(
             f"number of read entries {len(entries)} does not match declared count {entry_count}"
         )
 
@@ -145,7 +165,7 @@ def read_texture_cache(texture_cache: BytesIO, n: int) -> bytes:
     head = texture_cache.read(TEXTURE_CACHE_BYTE_COUNT)
 
     if len(head) != TEXTURE_CACHE_BYTE_COUNT:
-        raise Exception(
+        raise TextureCacheError(
             f"failed to read from texture cache at {offset}, "
             f"got {len(head)} of {TEXTURE_CACHE_BYTE_COUNT} bytes"
         )
