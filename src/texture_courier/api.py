@@ -21,6 +21,8 @@ from .util import format_bytes
 
 from PIL import Image
 
+# based on https://github.com/secondlife/viewer/blob/develop/indra/newview/lltexturecache.h
+
 T = TypeVar("T")
 
 
@@ -114,17 +116,16 @@ class TextureCache:
 
     def __get_read_bytes(self, i: int, entry: Entry) -> Callable[[], bytes]:
         def read_bytes() -> bytes:
-            head = read_texture_cache(self.texture_cache_file, i)
+            # the slot is a fixed width, so trim the zero padding that follows
+            head = read_texture_cache(self.texture_cache_file, i)[: entry.head_size]
 
-            if entry.image_size <= 601 and entry.body_size == 0:
-                # sometimes the file is smaller than 600 bytes, so using the head is
-                # sufficient
+            if entry.body_size == 0:
                 return head
-            else:
-                path = texture_location(self.cache_dir, entry.uuid)
-                body = read_texture_body(path)
 
-                return head + body
+            path = texture_location(self.cache_dir, entry.uuid)
+            body = read_texture_body(path)
+
+            return head + body
 
         return read_bytes
 

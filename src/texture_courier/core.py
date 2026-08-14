@@ -82,6 +82,24 @@ class Entry:
     def is_empty(self) -> bool:
         return self.image_size <= 0
 
+    @property
+    def head_size(self) -> int:
+        if self.is_empty:
+            return 0
+
+        return min(self.image_size, TEXTURE_CACHE_BYTE_COUNT)
+
+    @property
+    def cached_size(self) -> int:
+        if self.is_empty:
+            return 0
+
+        return self.head_size + self.body_size
+
+    @property
+    def is_complete(self) -> bool:
+        return not self.is_empty and self.image_size == self.cached_size
+
     @classmethod
     def from_bytes(cls, b: bytes) -> Self:
         unpack = struct.unpack(ENTRY_STRUCT_FORMAT, b)
