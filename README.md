@@ -18,9 +18,13 @@ simple CLI program and high-level python API to interact with the second life te
 
 ## use CLI
 
-install texture-courier with pip, or if you're feeling fancy, [uv tool install](https://docs.astral.sh/uv/guides/tools/)
+install texture-courier from PyPI. conventionally this is done with pip. but [uv tool install](https://docs.astral.sh/uv/guides/tools/#installing-tools) gives you proper dependency isolation without having to worry about environments.
 
-```
+```bash
+# with uv (preferred)
+uv tool install texture-courier
+
+# with pip
 pip install texture-courier
 ```
 
