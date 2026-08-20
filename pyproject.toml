@@ -25,6 +25,9 @@ dev = [
   "types-tqdm>=4",
 ]
 
+[tool.setuptools.package-data]
+texture_courier = ["py.typed"]
+
 [project.urls]
 Homepage = "https://github.com/furudean/texture-courier"
 Issues = "https://github.com/furudean/texture-courier/issues"
