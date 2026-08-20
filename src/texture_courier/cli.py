@@ -387,7 +387,7 @@ def main() -> None:
     with (
         interrupthandler() as h,
         tqdm(
-            total=cache.header.entry_count,
+            total=len(cache),
             desc="extracting textures",
             unit="tex",
             delay=1,

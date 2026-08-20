@@ -73,12 +73,7 @@ class Texture(Entry):
         return self.head_size + body_size
 
     def loads_jp2(self) -> bytes:
-        """Put the texture in a jp2 container without decoding it
-
-        The cache holds a bare codestream, which most software will not open.
-        A jp2 is that same codestream in a few bytes of boxes, so this costs
-        very little to do.
-        """
+        """Put the texture in a jp2 container"""
         return wrap_jp2(self.loads())
 
     def loads_thumbnail_png(self) -> bytes | None:
@@ -132,7 +127,7 @@ class TextureCache:
         total_size = sum(texture.image_size for texture in self)
 
         return (
-            f"<TextureCache {self.cache_dir.resolve()}, {self.header.entry_count} entries, {format_bytes(total_size)}>"
+            f"<TextureCache {self.cache_dir.resolve()}, {len(self)} textures, {format_bytes(total_size)}>"
         )
 
     def __get_read_bytes(self, i: int, entry: Entry) -> Callable[[], bytes]:
@@ -160,8 +155,6 @@ class TextureCache:
         return read_thumbnail
 
     def refresh(self) -> Iterator[Texture]:
-        old_entry_count = self.header.entry_count if hasattr(self, "header") else 0
-
         self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
         self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
         self.header = Header.from_texture_entries(self.texture_entries_file)
@@ -174,13 +167,15 @@ class TextureCache:
             entry_count=self.header.entry_count,
         )
 
-        if self.header.entry_count < old_entry_count:
-            # the cache was cleared
-            self.textures = {}
-
         changed_textures: dict[str, Texture] = {}
+        live: set[str] = set()
 
         for i, entry in enumerate(self.entries):
+            if entry.is_empty:
+                continue
+
+            live.add(entry.uuid)
+
             if entry != self.get(entry.uuid, None):
                 changed_textures[entry.uuid] = Texture(
                     index=i,
@@ -190,6 +185,7 @@ class TextureCache:
                     body_path=texture_location(self.cache_dir, entry.uuid),
                 )
 
+        self.textures = {uuid: texture for uuid, texture in self.textures.items() if uuid in live}
         self.textures |= changed_textures
 
         return iter(changed_textures.values())
