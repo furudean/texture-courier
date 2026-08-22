@@ -14,6 +14,7 @@ from watchdog.observers.api import BaseObserver
 from .core import (
     Entry,
     Header,
+    TextureCacheError,
     Thumbnail,
     decode_texture_entries,
     read_fast_cache,
@@ -21,7 +22,10 @@ from .core import (
     read_texture_cache,
     texture_location,
 )
-from .encode import encode_png, wrap_jp2
+from .encode import (
+    encode_png,
+    wrap_jp2,
+)
 from .util import format_bytes
 
 T = TypeVar("T")
@@ -34,10 +38,6 @@ def loads_bytes_io(p: Path) -> BytesIO:
 class Texture(Entry):
     index: int
     body_path: Path
-    loads: Callable[[], bytes]
-    """Open texture as a bytes object"""
-    loads_thumbnail: Callable[[], Thumbnail | None]
-    """Read this texture's fast cache thumbnail, if there is one"""
 
     def __init__(
         self,
@@ -45,23 +45,39 @@ class Texture(Entry):
         index: int,
         entry: Entry,
         body_path: Path,
-        loads: Callable[[], bytes],
-        loads_thumbnail: Callable[[], Thumbnail | None],
+        read_head: Callable[[], bytes],
+        read_thumbnail: Callable[[], Thumbnail | None],
     ):
         super().__init__(**entry.__dict__)
 
         self.index = index
         self.body_path = body_path
-        self.loads = loads
-        self.loads_thumbnail = loads_thumbnail
+        self.__read_head = read_head
+        self.__read_thumbnail = read_thumbnail
 
     def __repr__(self) -> str:
         size = format_bytes(self.image_size) if not self.is_empty else "empty"
-        return f"<Texture {self.uuid}, {self.time}, {size}, is_downloaded={self.is_downloaded()}>"
 
-    def is_downloaded(self) -> bool:
-        """Check if the texture file is fully downloaded"""
-        return self.is_complete and self.fs_size() == self.cached_size
+        return f"<Texture {self.uuid}, {self.time}, {size}, whole={self.whole()}>"
+
+    def whole(self) -> bool:
+        """Whether the cache claims to hold the whole image, head and body together
+
+        Only the entry's account of itself, which costs nothing to ask for.
+        Whether the bytes bear it out is settled when they are read.
+        """
+        return self.is_complete
+
+    def __incomplete(self) -> TextureCacheError:
+        return TextureCacheError(f"{self.uuid} holds {self.cached_size} of {self.image_size} bytes")
+
+    def __verify(self, head: bytes, body_size: int, tail: bytes) -> None:
+        """The one account of what a whole texture is, for whichever bytes the caller holds"""
+        if not self.is_complete:
+            raise self.__incomplete()
+
+        if body_size != self.body_size:
+            raise TextureCacheError(f"{self.uuid} has a {body_size} byte body, entry describes {self.body_size}")
 
     def fs_size(self) -> int:
         """Get the size of the texture file on disk"""
@@ -72,14 +88,31 @@ class Texture(Entry):
 
         return self.head_size + body_size
 
-    def loads_jp2(self) -> bytes:
-        """Put the texture in a jp2 container"""
-        return wrap_jp2(self.loads())
+    def loads_j2c(self, *, verify: bool = True) -> bytes:
+        """Open the bare codestream as a bytes object, refusing anything cut short"""
+        # the body runs to megabytes, so the entry gets its say before the read
+        if verify and not self.is_complete:
+            raise self.__incomplete()
+
+        head = self.__read_head()
+        body = b"" if self.body_size == 0 else read_texture_body(self.body_path)
+        codestream = head + body
+
+        if verify:
+            # against the bytes in hand rather than the file, a viewer writing
+            # to the cache can move the body between a check and the read after
+            self.__verify(head, len(body), codestream)
+
+        return codestream
+
+    def loads_jp2(self, *, verify: bool = True) -> bytes:
+        """Wrap the texture data in a jp2 container"""
+        return wrap_jp2(self.loads_j2c(verify=verify))
 
     def loads_thumbnail_png(self) -> bytes | None:
-        """Encode the fast cache thumbnail as a png"""
+        """Encode the item's thumbnail as a png"""
 
-        thumbnail = self.loads_thumbnail()
+        thumbnail = self.__read_thumbnail()
 
         if thumbnail is None:
             return None
@@ -91,8 +124,6 @@ class TextureCache:
     cache_dir: Path
     texture_entries_file: BytesIO
     texture_cache_file: BytesIO
-    fast_cache_file: BytesIO | None
-    """FastCache.cache, absent on caches written before it existed"""
 
     header: Header
     entries: list[Entry]
@@ -100,10 +131,10 @@ class TextureCache:
 
     def __init__(self, cache_dir: str | Path):
         self.cache_dir = Path(cache_dir)
-        # these are per instance, a class level default would be shared by
-        # every cache in the process
         self.entries = []
         self.textures = {}
+        self.__entries_raw = b""
+        self.__fast_cache_file: BytesIO | None = None
 
         if (
             not self.cache_dir.is_dir()
@@ -126,24 +157,27 @@ class TextureCache:
     def __repr__(self) -> str:
         total_size = sum(texture.image_size for texture in self)
 
-        return (
-            f"<TextureCache {self.cache_dir.resolve()}, {len(self)} textures, {format_bytes(total_size)}>"
-        )
+        return f"<TextureCache {self.cache_dir.resolve()}, {len(self)} textures, {format_bytes(total_size)}>"
 
-    def __get_read_bytes(self, i: int, entry: Entry) -> Callable[[], bytes]:
-        def read_bytes() -> bytes:
+    @property
+    def fast_cache_file(self) -> BytesIO | None:
+        """FastCache.cache, read on first use, absent on caches written before it
+
+        Bigger than the rest of the cache put together and untouched unless
+        somebody asks for a thumbnail, so refreshing does not pay for it.
+        """
+        if self.__fast_cache_file is None:
+            path = self.cache_dir / "FastCache.cache"
+            self.__fast_cache_file = loads_bytes_io(path) if path.is_file() else None
+
+        return self.__fast_cache_file
+
+    def __get_read_head(self, i: int, entry: Entry) -> Callable[[], bytes]:
+        def read_head() -> bytes:
             # the slot is a fixed width, so trim the zero padding that follows
-            head = read_texture_cache(self.texture_cache_file, i)[: entry.head_size]
+            return read_texture_cache(self.texture_cache_file, i)[: entry.head_size]
 
-            if entry.body_size == 0:
-                return head
-
-            path = texture_location(self.cache_dir, entry.uuid)
-            body = read_texture_body(path)
-
-            return head + body
-
-        return read_bytes
+        return read_head
 
     def __get_read_thumbnail(self, i: int) -> Callable[[], Thumbnail | None]:
         def read_thumbnail() -> Thumbnail | None:
@@ -155,17 +189,28 @@ class TextureCache:
         return read_thumbnail
 
     def refresh(self) -> Iterator[Texture]:
-        self.texture_entries_file = loads_bytes_io(self.cache_dir / "texture.entries")
-        self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
-        self.header = Header.from_texture_entries(self.texture_entries_file)
+        entries_raw = (self.cache_dir / "texture.entries").read_bytes()
 
-        fast_cache_path = self.cache_dir / "FastCache.cache"
-        self.fast_cache_file = loads_bytes_io(fast_cache_path) if fast_cache_path.is_file() else None
+        # a running viewer writes this file constantly and most of those writes
+        # leave every entry saying what it said before. comparing the bytes
+        # costs a memcmp, decoding them to find out costs fifty thousand
+        # timestamps and uuids
+        if entries_raw == self.__entries_raw:
+            return iter(())
+
+        self.__entries_raw = entries_raw
+        self.texture_entries_file = BytesIO(entries_raw)
+        self.header = Header.from_texture_entries(self.texture_entries_file)
 
         self.entries = decode_texture_entries(
             self.texture_entries_file,
             entry_count=self.header.entry_count,
         )
+
+        # only worth reading once an entry has actually moved, it is the
+        # biggest file in the cache after the thumbnails
+        self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
+        self.__fast_cache_file = None
 
         changed_textures: dict[str, Texture] = {}
         live: set[str] = set()
@@ -180,8 +225,8 @@ class TextureCache:
                 changed_textures[entry.uuid] = Texture(
                     index=i,
                     entry=entry,
-                    loads=self.__get_read_bytes(i, entry),
-                    loads_thumbnail=self.__get_read_thumbnail(i),
+                    read_head=self.__get_read_head(i, entry),
+                    read_thumbnail=self.__get_read_thumbnail(i),
                     body_path=texture_location(self.cache_dir, entry.uuid),
                 )
 
@@ -191,10 +236,16 @@ class TextureCache:
         return iter(changed_textures.values())
 
     def watch(self, handler: Callable[[list[Texture]], Any]) -> BaseObserver:
-        """Watch the cache directory for changes and call the handler function on updates."""
+        """Watch the cache directory for changes and call handler function on updates."""
 
         def on_modified(event: DirModifiedEvent | FileModifiedEvent) -> None:
-            changed_textures = list(self.refresh())
+            try:
+                changed_textures = list(self.refresh())
+            except (TextureCacheError, OSError):
+                # a viewer part way through rewriting texture.entries leaves it
+                # briefly inconsistent. letting that out kills the thread the
+                # observer dispatches on and the watch goes deaf for good
+                return
 
             if changed_textures:
                 handler(changed_textures)

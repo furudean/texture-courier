@@ -8,6 +8,7 @@ from .core import TextureCacheError
 # anything. ISO/IEC 15444-1 annex I
 SOC_MARKER = b"\xff\x4f"
 SIZ_MARKER = b"\xff\x51"
+EOC_MARKER = b"\xff\xd9"
 SIZ_BYTE_COUNT = 43
 
 JP2_SIGNATURE = b"\x00\x00\x00\x0cjP  \r\n\x87\n"

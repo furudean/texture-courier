@@ -159,38 +159,30 @@ def save_texture(texture: Texture, output_dir: Path, args: Args) -> Path:
     if texture.is_empty:
         raise TextureEmptyError
 
-    if texture.is_downloaded() is False and not args.skip_integrity:
-        raise TextureIncompleteError
+    save_path = output_dir / f"{texture.uuid}.{'j2c' if args.raw else 'jp2'}"
 
-    if args.raw is False:
-        save_path = output_dir / f"{texture.uuid}.jp2"
+    if save_path.exists() and not args.force:
+        raise FileExistsError
 
-        if save_path.exists() and not args.force:
-            raise FileExistsError
+    verify = not args.skip_integrity
 
-        # the cache stores textures in a raw jpeg2000 codestream format
-        # that is hard for most operating systems to read, which isn't
-        # intended to be used for storage. wrapping it in a jp2 container
-        # fixes that without touching the codestream itself
-        save_path.write_bytes(texture.loads_jp2())
-    else:
-        save_path = output_dir / f"{texture.uuid}.j2c"
+    try:
+        if args.raw:
+            b = texture.loads_j2c(verify=verify)
+        else:
+            b = texture.loads_jp2(verify=verify)
+    except TextureCacheError as e:
+        raise TextureIncompleteError(str(e)) from e
 
-        if save_path.exists() and not args.force:
-            raise FileExistsError
+    save_path.write_bytes(b)
 
-        save_path.write_bytes(texture.loads())
-
-    # set last access and modification times to the same as the date in cache
-    # (atime, mtime)
+    # stamp last access and modification times to the same as the date in cache
     os.utime(save_path, (texture.time.timestamp(), texture.time.timestamp()))
 
     return save_path
 
 
 def save_thumbnail(texture: Texture, output_dir: Path, args: Args) -> Path:
-    # deliberately not gated on is_downloaded, a thumbnail is the only picture
-    # of a texture the viewer never finished fetching
     if texture.is_empty:
         raise TextureEmptyError
 

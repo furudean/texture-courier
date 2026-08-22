@@ -4,14 +4,13 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Self
-from uuid import UUID
 
 from .util import format_bytes
 
 HEADER_STRUCT_FORMAT = "fI32sI"
 HEADER_BYTE_COUNT = 44
 
-ENTRY_STRUCT_FORMAT = "16BiiI"
+ENTRY_STRUCT_FORMAT = "16siiI"
 ENTRY_BYTE_COUNT = 28
 
 TEXTURE_CACHE_BYTE_COUNT = 600
@@ -28,6 +27,12 @@ FAST_CACHE_BYTE_COUNT = FAST_CACHE_HEADER_BYTE_COUNT + FAST_CACHE_DATA_BYTE_COUN
 
 class TextureCacheError(Exception):
     """Cache not laid out the way this program expects"""
+
+
+def format_uuid(b: bytes) -> str:
+    h = b.hex()
+
+    return f"{h[:8]}-{h[8:12]}-{h[12:16]}-{h[16:20]}-{h[20:]}"
 
 
 class Header:
@@ -104,6 +109,7 @@ class Entry:
             and self.uuid == value.uuid
             and self.time == value.time
             and self.body_size == value.body_size
+            and self.image_size == value.image_size
         )
 
     @property
@@ -130,16 +136,13 @@ class Entry:
 
     @classmethod
     def from_bytes(cls, b: bytes) -> Self:
-        unpack = struct.unpack(ENTRY_STRUCT_FORMAT, b)
-
-        uuid = str(UUID(int=int.from_bytes(unpack[0:16], byteorder="big")))
-        rest = unpack[16:]
+        uuid, image_size, body_size, time = struct.unpack(ENTRY_STRUCT_FORMAT, b)
 
         return cls(
-            uuid=uuid,
-            image_size=rest[0],
-            body_size=rest[1],
-            time=datetime.fromtimestamp(rest[2]),  # noqa: DTZ006
+            uuid=format_uuid(uuid),
+            image_size=image_size,
+            body_size=body_size,
+            time=datetime.fromtimestamp(time),  # noqa: DTZ006
         )
 
 
@@ -214,20 +217,22 @@ def read_fast_cache(fast_cache: BytesIO, n: int) -> Thumbnail | None:
 
 def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[Entry]:
     texture_entries.seek(HEADER_BYTE_COUNT)
-    entries = []
 
-    for _ in range(entry_count):
-        entry_bytes = texture_entries.read(ENTRY_BYTE_COUNT)
+    expected = entry_count * ENTRY_BYTE_COUNT
+    raw = texture_entries.read(expected)
 
-        if len(entry_bytes) != ENTRY_BYTE_COUNT:
-            raise TextureCacheError(f"failed to read entry at {texture_entries.tell()}")
+    if len(raw) != expected:
+        raise TextureCacheError(f"read {len(raw)} bytes of entries, expected {expected} for {entry_count} entries")
 
-        entries.append(Entry.from_bytes(entry_bytes))
-
-    if len(entries) != entry_count:
-        raise TextureCacheError(f"number of read entries {len(entries)} does not match declared count {entry_count}")
-
-    return entries
+    return [
+        Entry(
+            uuid=format_uuid(uuid),
+            image_size=image_size,
+            body_size=body_size,
+            time=datetime.fromtimestamp(time),  # noqa: DTZ006
+        )
+        for uuid, image_size, body_size, time in struct.iter_unpack(ENTRY_STRUCT_FORMAT, raw)
+    ]
 
 
 def read_texture_cache(texture_cache: BytesIO, n: int) -> bytes:
