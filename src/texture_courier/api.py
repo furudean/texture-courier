@@ -1,15 +1,7 @@
 from collections.abc import Callable, Iterator
 from io import BytesIO
 from pathlib import Path
-from typing import Any, TypeVar
-
-from watchdog.events import (
-    DirModifiedEvent,
-    FileModifiedEvent,
-    PatternMatchingEventHandler,
-)
-from watchdog.observers import Observer
-from watchdog.observers.api import BaseObserver
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from .core import (
     Entry,
@@ -27,6 +19,10 @@ from .encode import (
     wrap_jp2,
 )
 from .util import format_bytes
+
+if TYPE_CHECKING:
+    from watchdog.events import DirModifiedEvent, FileModifiedEvent
+    from watchdog.observers.api import BaseObserver
 
 T = TypeVar("T")
 
@@ -235,10 +231,20 @@ class TextureCache:
 
         return iter(changed_textures.values())
 
-    def watch(self, handler: Callable[[list[Texture]], Any]) -> BaseObserver:
-        """Watch the cache directory for changes and call handler function on updates."""
+    def watch(self, handler: Callable[[list[Texture]], Any]) -> "BaseObserver":
+        """Watch the cache directory for changes and call handler function on updates.
 
-        def on_modified(event: DirModifiedEvent | FileModifiedEvent) -> None:
+        Requires texture-courier[watchdog] extra to function
+        """
+        try:
+            from watchdog.events import PatternMatchingEventHandler
+            from watchdog.observers import Observer
+        except ImportError as e:
+            raise ImportError(
+                'watching a cache needs watchdog extra. install with "pip install texture-courier[watcher]"'
+            ) from e
+
+        def on_modified(event: "DirModifiedEvent | FileModifiedEvent") -> None:
             try:
                 changed_textures = list(self.refresh())
             except (TextureCacheError, OSError):

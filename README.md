@@ -22,10 +22,10 @@ install texture-courier from PyPI. conventionally this is done with pip. but [uv
 
 ```bash
 # with uv (preferred)
-uv tool install texture-courier
+uv tool install texture-courier[cli]
 
 # with pip
-pip install texture-courier
+pip install texture-courier[cli]
 ```
 
 then, run it on the command line like

@@ -423,8 +423,13 @@ wheels = [
 name = "texture-courier"
 version = "0.0.12"
 source = { editable = "." }
-dependencies = [
+
+[package.optional-dependencies]
+cli = [
     { name = "tqdm" },
+    { name = "watchdog" },
+]
+watcher = [
     { name = "watchdog" },
 ]
 
@@ -440,9 +445,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "tqdm", specifier = ">=4" },
-    { name = "watchdog", specifier = ">=6" },
+    { name = "texture-courier", extras = ["watcher"], marker = "extra == 'cli'" },
+    { name = "tqdm", marker = "extra == 'cli'", specifier = ">=4" },
+    { name = "watchdog", marker = "extra == 'watcher'", specifier = ">=6" },
 ]
+provides-extras = ["watcher", "cli"]
 
 [package.metadata.requires-dev]
 dev = [

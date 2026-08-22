@@ -338,7 +338,12 @@ def main() -> None:
                 if args.output_mode in ("files", "debug") and save_path:
                     print(save_path.resolve())
 
-        observer = cache.watch(handler)
+        try:
+            observer = cache.watch(handler)
+        except ImportError as e:
+            # if cli installed without watcher extra, most likely
+            print(f"error: {e}")
+            sys.exit(1)
 
         clear_screen()
 
