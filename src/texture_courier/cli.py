@@ -168,9 +168,9 @@ def save_texture(texture: Texture, output_dir: Path, args: Args) -> Path:
 
     try:
         if args.raw:
-            b = texture.loads_j2c(verify=verify)
+            b = texture.as_jpeg_2000_codestream(verify=verify)
         else:
-            b = texture.loads_jp2(verify=verify)
+            b = texture.as_jpeg2000(verify=verify)
     except TextureCacheError as e:
         raise TextureIncompleteError(str(e)) from e
 
@@ -191,7 +191,7 @@ def save_thumbnail(texture: Texture, output_dir: Path, args: Args) -> Path:
     if save_path.exists() and not args.force:
         raise FileExistsError
 
-    png = texture.loads_thumbnail_png()
+    png = texture.thumbnail_as_png()
 
     if png is None:
         raise TextureEmptyError

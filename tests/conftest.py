@@ -25,7 +25,7 @@ def sample_textures() -> dict[str, Texture]:
         if not texture.whole():
             continue
 
-        components = codestream_size(texture.loads_j2c())[2]
+        components = codestream_size(texture.as_jpeg_2000_codestream())[2]
         samples.setdefault(f"{components} components", texture)
 
     return dict(sorted(samples.items()))

@@ -1,19 +1,17 @@
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from .api import Texture, TextureCache
-from .core import Entry, Header
+from .core import Entry, Header, TextureCacheError
 from .find import list_texture_caches
-
-if TYPE_CHECKING:
-    from .cli import main
 
 __all__ = [
     "Entry",
     "Header",
     "Texture",
     "TextureCache",
+    "TextureCacheError",
+    "encode",
     "list_texture_caches",
-    "main",
 ]
 
 

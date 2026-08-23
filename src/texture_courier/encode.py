@@ -53,7 +53,7 @@ def jp2_box(kind: bytes, payload: bytes) -> bytes:
 
 
 def wrap_jp2(codestream: bytes) -> bytes:
-    """Put a codestream in a jp2 container, byte for byte, without recoding it"""
+    """Put a JPEG 2000 codestream in a container without reencoding it"""
     width, height, components, bit_depth = codestream_size(codestream)
 
     if not 0 < components <= MAX_COMPONENTS:

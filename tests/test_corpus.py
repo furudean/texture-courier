@@ -25,7 +25,7 @@ def test_the_fixture_cache_is_worth_testing_against(
 
 @pytest.mark.parametrize("texture", SAMPLES.values(), ids=SAMPLES.keys())
 def test_a_wrapped_texture_describes_itself_correctly(texture: Texture) -> None:
-    original = texture.loads_j2c()
+    original = texture.as_jpeg_2000_codestream()
     width, height, components, bit_depth = codestream_size(original)
 
     jp2 = wrap_jp2(original)
@@ -41,21 +41,21 @@ def test_a_wrapped_texture_describes_itself_correctly(texture: Texture) -> None:
 
 def test_every_texture_keeps_its_bytes(textures: list[Texture]) -> None:
     for texture in textures:
-        original = texture.loads_j2c()
+        original = texture.as_jpeg_2000_codestream()
 
         assert boxes(wrap_jp2(original))[b"jp2c"] == original, texture.uuid
 
 
 def test_wrapping_costs_a_header_and_nothing_else(textures: list[Texture]) -> None:
     for texture in textures:
-        overhead = len(texture.loads_jp2()) - len(texture.loads_j2c())
+        overhead = len(texture.as_jpeg2000()) - len(texture.as_jpeg_2000_codestream())
 
         assert 0 < overhead < 256, texture.uuid
 
 
 def test_every_thumbnail_encodes(thumbnails: list[tuple[Texture, Thumbnail]]) -> None:
     for texture, thumbnail in thumbnails:
-        encoded = texture.loads_thumbnail_png()
+        encoded = texture.thumbnail_as_png()
 
         assert encoded is not None, texture.uuid
 

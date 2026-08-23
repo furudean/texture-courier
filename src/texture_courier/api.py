@@ -84,8 +84,8 @@ class Texture(Entry):
 
         return self.head_size + body_size
 
-    def loads_j2c(self, *, verify: bool = True) -> bytes:
-        """Open the bare codestream as a bytes object, refusing anything cut short"""
+    def as_jpeg_2000_codestream(self, *, verify: bool = True) -> bytes:
+        """Open the bare codestream as a bytes object"""
         # the body runs to megabytes, so the entry gets its say before the read
         if verify and not self.is_complete:
             raise self.__incomplete()
@@ -101,11 +101,11 @@ class Texture(Entry):
 
         return codestream
 
-    def loads_jp2(self, *, verify: bool = True) -> bytes:
-        """Wrap the texture data in a jp2 container"""
-        return wrap_jp2(self.loads_j2c(verify=verify))
+    def as_jpeg2000(self, *, verify: bool = True) -> bytes:
+        """Wrap the codestream in a JPEG 2000 container"""
+        return wrap_jp2(self.as_jpeg_2000_codestream(verify=verify))
 
-    def loads_thumbnail_png(self) -> bytes | None:
+    def thumbnail_as_png(self) -> bytes | None:
         """Encode the item's thumbnail as a png"""
 
         thumbnail = self.__read_thumbnail()
