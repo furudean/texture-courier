@@ -47,6 +47,32 @@ this dumps the contents of the cache to a directory (by default, to
 
 see `texture-courier --help` for other options.
 
+## api
+
+```python
+from texture_courier import list_texture_caches, TextureCache
+
+caches = list_texture_caches()
+# [PosixPath('/Users/meri/Library/Caches/Firestorm_x64/texturecache')]
+
+cache = TextureCache("/Users/meri/Library/Caches/Firestorm_x64/texturecache")
+# <TextureCache /Users/meri/Library/Caches/Firestorm_x64/texturecache, 26478 textures, 3 GB>
+
+for texture in cache:
+    print(texture)
+
+# <Texture 93ff0fc0-731a-b04e-8a66-b6489c059e04, 2026-08-21 22:39:00, 20 KB, whole=True>
+# <Texture eb2667d6-dbc8-7188-ea0e-2bc8bc8da19b, 2026-08-21 22:39:00, 39 KB, whole=True>
+# <Texture f75d9ea7-2c6f-3d11-5645-7c7c0a195721, 2026-08-21 22:38:58, 597 bytes, whole=True>
+# ...
+
+texture = cache.get("93ff0fc0-731a-b04e-8a66-b6489c059e04")
+
+with open(f"{texture.uuid}.jp2", "wb") as f:
+    f.write(texture.loads_jp2())
+
+```
+
 ## hacking
 
 i use `pip install --editable .` to install texture-courier as an editable
