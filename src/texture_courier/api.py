@@ -84,7 +84,7 @@ class Texture(Entry):
 
         return self.head_size + body_size
 
-    def as_jpeg_2000_codestream(self, *, verify: bool = True) -> bytes:
+    def codestream(self, *, verify: bool = True) -> bytes:
         """Open the bare codestream as a bytes object"""
         # the body runs to megabytes, so the entry gets its say before the read
         if verify and not self.is_complete:
@@ -101,11 +101,11 @@ class Texture(Entry):
 
         return codestream
 
-    def as_jpeg2000(self, *, verify: bool = True) -> bytes:
+    def jpeg_2000(self, *, verify: bool = True) -> bytes:
         """Wrap the codestream in a JPEG 2000 container"""
-        return wrap_jp2(self.as_jpeg_2000_codestream(verify=verify))
+        return wrap_jp2(self.codestream(verify=verify))
 
-    def thumbnail_as_png(self) -> bytes | None:
+    def thumbnail_png(self) -> bytes | None:
         """Encode the item's thumbnail as a png"""
 
         thumbnail = self.__read_thumbnail()
