@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterator
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from .core import (
     Entry,
@@ -142,6 +142,7 @@ class TextureCache:
         self.textures = {}
         self.__entries_raw = b""
         self.__fast_cache_file: BytesIO | None = None
+        self.__order: list[Texture] | None = None
 
         if (
             not self.cache_dir.is_dir()
@@ -160,6 +161,30 @@ class TextureCache:
 
     def __len__(self) -> int:
         return len(self.textures)
+
+    def __contains__(self, key: object) -> bool:
+        if isinstance(key, Entry):
+            return self.textures.get(key.uuid) == key
+
+        return isinstance(key, str) and key in self.textures
+
+    def __ordered(self) -> list[Texture]:
+        if self.__order is None:
+            self.__order = list(self.textures.values())
+
+        return self.__order
+
+    @overload
+    def __getitem__(self, key: str | int) -> Texture: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> list[Texture]: ...
+
+    def __getitem__(self, key: str | int | slice) -> Texture | list[Texture]:
+        if isinstance(key, str):
+            return self.textures[key]
+
+        return self.__ordered()[key]
 
     def __repr__(self) -> str:
         total_size = sum(texture.image_size for texture in self)
@@ -239,6 +264,7 @@ class TextureCache:
 
         self.textures = {uuid: texture for uuid, texture in self.textures.items() if uuid in live}
         self.textures |= changed_textures
+        self.__order = None
 
         return iter(changed_textures.values())
 
@@ -276,5 +302,14 @@ class TextureCache:
 
         return observer
 
-    def get(self, uuid: str, default: T | None = None) -> Texture | T:
-        return self.textures.get(uuid, default)  # type: ignore
+    @overload
+    def get(self, uuid: str) -> Texture | None: ...
+
+    @overload
+    def get(self, uuid: str, default: Texture) -> Texture: ...
+
+    @overload
+    def get(self, uuid: str, default: T) -> Texture | T: ...
+
+    def get(self, uuid: str, default: T | None = None) -> Texture | T | None:
+        return self.textures.get(uuid, default)
