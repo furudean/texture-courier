@@ -85,7 +85,7 @@ class Texture(Entry):
             raise TextureCacheError(f"{self.uuid} is missing the marker that ends a codestream")
 
     def fs_size(self) -> int:
-        """Get the size of the texture file on disk"""
+        """Get the size of the texture file on disk in bytes"""
         if self.is_empty:
             return 0
 
