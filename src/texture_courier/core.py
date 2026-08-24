@@ -1,6 +1,7 @@
 import struct
 from collections.abc import Iterator
 from datetime import datetime
+from functools import total_ordering
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Self
@@ -87,6 +88,7 @@ class Header:
         return header
 
 
+@total_ordering
 class Entry:
     uuid: str
     image_size: int
@@ -103,14 +105,20 @@ class Entry:
         size = format_bytes(self.image_size) if not self.is_empty else "empty"
         return f"<Entry {self.uuid}, {self.time}, {size}>"
 
+    def __key(self) -> tuple[datetime, str, int, int]:
+        return (self.time, self.uuid, self.image_size, self.body_size)
+
     def __eq__(self, value: object) -> bool:
-        return (
-            isinstance(value, Entry)
-            and self.uuid == value.uuid
-            and self.time == value.time
-            and self.body_size == value.body_size
-            and self.image_size == value.image_size
-        )
+        return isinstance(value, Entry) and self.__key() == value.__key()
+
+    def __lt__(self, value: object) -> bool:
+        if not isinstance(value, Entry):
+            return NotImplemented
+
+        return self.__key() < value.__key()
+
+    def __hash__(self) -> int:
+        return hash(self.__key())
 
     @property
     def is_empty(self) -> bool:

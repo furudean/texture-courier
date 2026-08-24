@@ -253,7 +253,7 @@ class TextureCache:
 
             live.add(entry.uuid)
 
-            if entry != self.get(entry.uuid, None):
+            if entry not in self:
                 changed_textures[entry.uuid] = Texture(
                     index=i,
                     entry=entry,
