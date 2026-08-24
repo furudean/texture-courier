@@ -30,6 +30,7 @@ class Args(argparse.Namespace):
     cache_dir: Path | None
     output_dir: Path
     output_mode: OutputMode
+    watch: bool
     force: bool
     raw: bool
     skip_integrity: bool
@@ -114,7 +115,7 @@ def parse_args() -> Args:
         "--watch",
         "-w",
         action="store_true",
-        help="watch the cache directory for changes",
+        help="watch the cache directory, extracting textures as the viewer writes them",
         default=False,
     )
 
@@ -312,7 +313,7 @@ def main() -> None:
                     incomplete_stack.add(texture.uuid)
                 except Exception as e:  # noqa: BLE001
                     # a texture the viewer is midway through writing shouldn't
-                    # take the observer thread down with it
+                    # stop the rest of the batch from being written
                     failed_stack.add(texture.uuid)
 
                     if args.output_mode == "debug":
@@ -338,8 +339,14 @@ def main() -> None:
                 if args.output_mode in ("files", "debug") and save_path:
                     print(save_path.resolve())
 
+        def on_error(error: Exception) -> None:
+            # torn reads of a cache the viewer is midway through writing are
+            # ordinary, and the next event reads it properly
+                if args.output_mode in ("progress", "debug"):
+                    print(f"error reading cache: {error}")
+
         try:
-            observer = cache.watch(handler)
+            watch = cache.watch(handler, on_error=on_error)
         except ImportError as e:
             # if cli installed without watcher extra, most likely
             print(f"error: {e}")
@@ -351,18 +358,15 @@ def main() -> None:
             print(f"watching for changes in {cache.cache_dir.resolve()}")
             print(f"extracting to {args.output_dir.resolve()}")
             print()
-            print("input ctrl+c or ctrl+d to stop")
+            print("input ctrl+c to stop")
             print()
 
-        with interrupthandler() as h:
+        with interrupthandler() as h, watch:
             try:
-                while observer.is_alive() and not h.interrupted:
-                    observer.join(1)
+                while watch.is_alive() and not h.interrupted:
+                    watch.join(1)
             except KeyboardInterrupt:
                 pass
-            finally:
-                observer.stop()
-                observer.join()
 
             end(
                 args=args,
@@ -372,6 +376,9 @@ def main() -> None:
                 error_write_textures=len(failed_stack),
                 empty_textures=len(empty_stack),
             )
+
+            if not h.interrupted:
+                sys.exit(74)
 
             sys.exit(130)
 

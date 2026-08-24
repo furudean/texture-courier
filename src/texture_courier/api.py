@@ -1,7 +1,7 @@
 from collections.abc import Callable, Iterator
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, overload
+from typing import Any, TypeVar, overload
 
 from .core import (
     ENTRY_BYTE_COUNT,
@@ -23,10 +23,7 @@ from .encode import (
     wrap_jp2,
 )
 from .util import format_bytes
-
-if TYPE_CHECKING:
-    from watchdog.events import DirModifiedEvent, FileModifiedEvent
-    from watchdog.observers.api import BaseObserver
+from .watch import DEBOUNCE_SECONDS, Watch
 
 T = TypeVar("T")
 
@@ -348,39 +345,18 @@ class TextureCache:
 
         return iter(changed_textures.values())
 
-    def watch(self, handler: Callable[[list[Texture]], Any]) -> "BaseObserver":
+    def watch(
+        self,
+        handler: Callable[[list[Texture]], Any],
+        *,
+        on_error: Callable[[Exception], Any] | None = None,
+        debounce: float = DEBOUNCE_SECONDS,
+    ) -> Watch:
         """Watch the cache directory for changes and call handler function on updates.
 
-        Requires texture-courier[watchdog] extra to function
+        Requires texture-courier[watcher] extra to function
         """
-        try:
-            from watchdog.events import PatternMatchingEventHandler
-            from watchdog.observers import Observer
-        except ImportError as e:
-            raise ImportError(
-                'watching a cache needs watchdog extra. install with "pip install texture-courier[watcher]"'
-            ) from e
-
-        def on_modified(event: "DirModifiedEvent | FileModifiedEvent") -> None:
-            try:
-                changed_textures = list(self.refresh())
-            except (TextureCacheError, OSError):
-                # a viewer part way through rewriting texture.entries leaves it
-                # briefly inconsistent. letting that out kills the thread the
-                # observer dispatches on and the watch goes deaf for good
-                return
-
-            if changed_textures:
-                handler(changed_textures)
-
-        event_handler = PatternMatchingEventHandler(patterns=["texture.entries"])
-        event_handler.on_modified = on_modified  # type: ignore[method-assign]
-
-        observer = Observer()
-        observer.schedule(event_handler, str(self.cache_dir.resolve()))
-        observer.start()
-
-        return observer
+        return Watch(self, handler, on_error=on_error, debounce=debounce)
 
     @overload
     def get(self, uuid: str) -> Texture | None: ...

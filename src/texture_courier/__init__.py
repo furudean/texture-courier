@@ -3,6 +3,7 @@ from typing import Any
 from .api import Texture, TextureCache
 from .core import Entry, Header, TextureCacheError
 from .find import list_texture_caches
+from .watch import Watch
 
 __all__ = [
     "Entry",
@@ -10,6 +11,7 @@ __all__ = [
     "Texture",
     "TextureCache",
     "TextureCacheError",
+    "Watch",
     "encode",
     "list_texture_caches",
 ]
