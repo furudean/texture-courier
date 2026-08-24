@@ -138,20 +138,24 @@ class Texture(Entry):
 
 class TextureCache:
     cache_dir: Path
-    _texture_entries_file: BytesIO
-    _texture_cache_file: BytesIO
 
     header: Header
     entries: list[Entry]
     textures: dict[str, Texture]
+
+    __entries_raw: bytes
+    __texture_entries_file: BytesIO
+    __texture_cache_file: BytesIO
+    __fast_cache_file: BytesIO | None
+    __order: list[Texture] | None
 
     def __init__(self, cache_dir: str | Path):
         self.cache_dir = Path(cache_dir)
         self.entries = []
         self.textures = {}
         self.__entries_raw = b""
-        self.__fast_cache_file: BytesIO | None = None
-        self.__order: list[Texture] | None = None
+        self.__fast_cache_file = None
+        self.__order = None
 
         if (
             not self.cache_dir.is_dir()
@@ -216,7 +220,7 @@ class TextureCache:
     def __get_read_head(self, i: int, entry: Entry) -> Callable[[], bytes]:
         def read_head() -> bytes:
             # the slot is a fixed width, so trim the zero padding that follows
-            return read_texture_cache(self._texture_cache_file, i)[: entry.head_size]
+            return read_texture_cache(self.__texture_cache_file, i)[: entry.head_size]
 
         return read_head
 
@@ -236,15 +240,15 @@ class TextureCache:
             return iter(())
 
         self.__entries_raw = entries_raw
-        self._texture_entries_file = BytesIO(entries_raw)
-        self.header = Header.from_texture_entries(self._texture_entries_file)
+        self.__texture_entries_file = BytesIO(entries_raw)
+        self.header = Header.from_texture_entries(self.__texture_entries_file)
 
         self.entries = decode_texture_entries(
-            self._texture_entries_file,
+            self.__texture_entries_file,
             entry_count=self.header.entry_count,
         )
 
-        self._texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
+        self.__texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
         self.__fast_cache_file = None
 
         changed_textures: dict[str, Texture] = {}
