@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from .core import (
+    ENTRY_BYTE_COUNT,
+    HEADER_BYTE_COUNT,
     Entry,
     Header,
     TextureCacheError,
@@ -27,6 +29,8 @@ if TYPE_CHECKING:
     from watchdog.observers.api import BaseObserver
 
 T = TypeVar("T")
+
+DIFF_BLOCK_BYTE_COUNT = 4096
 
 
 def loads_bytes_io(p: Path) -> BytesIO:
@@ -233,6 +237,46 @@ class TextureCache:
 
         return read_thumbnail
 
+    def __texture(self, i: int, entry: Entry) -> Texture:
+        return Texture(
+            index=i,
+            entry=entry,
+            read_head=self.__get_read_head(i, entry),
+            read_thumbnail=self.__get_read_thumbnail(i),
+            body_path=texture_location(self.cache_dir, entry.uuid),
+        )
+
+    def __changed_slots(self, entries_raw: bytes) -> list[int] | None:
+        previous = self.__entries_raw
+
+        # a header only passes validation against a length, so a length that
+        # differs is an entry count that differs, and every slot has moved
+        if len(previous) != len(entries_raw):
+            return None
+
+        slots: list[int] = []
+
+        for start in range(HEADER_BYTE_COUNT, len(entries_raw), DIFF_BLOCK_BYTE_COUNT):
+            stop = min(start + DIFF_BLOCK_BYTE_COUNT, len(entries_raw))
+
+            if previous[start:stop] == entries_raw[start:stop]:
+                continue
+
+            first = (start - HEADER_BYTE_COUNT) // ENTRY_BYTE_COUNT
+            last = (stop - HEADER_BYTE_COUNT - 1) // ENTRY_BYTE_COUNT
+
+            # a slot that straddles a block boundary falls in both halves
+            if slots:
+                first = max(first, slots[-1] + 1)
+
+            for i in range(first, last + 1):
+                offset = HEADER_BYTE_COUNT + i * ENTRY_BYTE_COUNT
+
+                if previous[offset : offset + ENTRY_BYTE_COUNT] != entries_raw[offset : offset + ENTRY_BYTE_COUNT]:
+                    slots.append(i)
+
+        return slots
+
     def refresh(self) -> Iterator[Texture]:
         entries_raw = (self.cache_dir / "texture.entries").read_bytes()
 
@@ -241,11 +285,46 @@ class TextureCache:
 
         texture_entries_file = BytesIO(entries_raw)
         header = Header.from_texture_entries(texture_entries_file)
+        slots = self.__changed_slots(entries_raw)
 
-        entries = decode_texture_entries(
-            texture_entries_file,
-            entry_count=header.entry_count,
-        )
+        changed_textures: dict[str, Texture] = {}
+        evicted: set[str] = set()
+
+        if slots is None:
+            entries = decode_texture_entries(
+                texture_entries_file,
+                entry_count=header.entry_count,
+            )
+            live: set[str] = set()
+
+            for i, entry in enumerate(entries):
+                if entry.is_empty:
+                    continue
+
+                live.add(entry.uuid)
+
+                if entry not in self:
+                    changed_textures[entry.uuid] = self.__texture(i, entry)
+
+            evicted = self.textures.keys() - live
+        else:
+            entries = list(self.entries)
+
+            for i in slots:
+                offset = HEADER_BYTE_COUNT + i * ENTRY_BYTE_COUNT
+                stale = entries[i]
+                entry = Entry.from_bytes(entries_raw[offset : offset + ENTRY_BYTE_COUNT])
+                entries[i] = entry
+
+                # the row's old occupant only goes if it has not since turned
+                # up in a row of its own
+                texture = self.textures.get(stale.uuid)
+
+                if texture is not None and texture.index == i:
+                    evicted.add(stale.uuid)
+
+                if not entry.is_empty:
+                    changed_textures[entry.uuid] = self.__texture(i, entry)
 
         texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
 
@@ -256,25 +335,12 @@ class TextureCache:
         self.header = header
         self.entries = entries
 
-        changed_textures: dict[str, Texture] = {}
-        live: set[str] = set()
-
-        for i, entry in enumerate(self.entries):
-            if entry.is_empty:
-                continue
-
-            live.add(entry.uuid)
-
-            if entry not in self:
-                changed_textures[entry.uuid] = Texture(
-                    index=i,
-                    entry=entry,
-                    read_head=self.__get_read_head(i, entry),
-                    read_thumbnail=self.__get_read_thumbnail(i),
-                    body_path=texture_location(self.cache_dir, entry.uuid),
-                )
-
-        textures = {uuid: texture for uuid, texture in self.textures.items() if uuid in live}
+        evicted -= changed_textures.keys()
+        textures = (
+            {uuid: texture for uuid, texture in self.textures.items() if uuid not in evicted}
+            if evicted
+            else dict(self.textures)
+        )
         textures |= changed_textures
 
         self.textures = textures
