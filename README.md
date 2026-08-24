@@ -59,22 +59,17 @@ cache = TextureCache("/Users/meri/Library/Caches/Firestorm_x64/texturecache")
 # <TextureCache /Users/meri/Library/Caches/Firestorm_x64/texturecache, 26478 textures, 3 GB>
 
 # the api implements an iterator and __getitem__, so you can interact with it like a list
-texture = cache["93ff0fc0-731a-b04e-8a66-b6489c059e04"]
-
-# <Texture 93ff0fc0-731a-b04e-8a66-b6489c059e04, 2026-08-21 22:39:00, 20 KB, whole=True>
-
-with open(f"{texture.uuid}.jp2", "wb") as f:
-    f.write(texture.jpeg_2000())
-
 first_ten = cache[:10]
-
-for tex in first_ten:
-    print(tex)
 
 # <Texture 93ff0fc0-731a-b04e-8a66-b6489c059e04, 2026-08-21 22:39:00, 20 KB, whole=True>
 # <Texture eb2667d6-dbc8-7188-ea0e-2bc8bc8da19b, 2026-08-21 22:39:00, 39 KB, whole=True>
 # <Texture f75d9ea7-2c6f-3d11-5645-7c7c0a195721, 2026-08-21 22:38:58, 597 bytes, whole=True>
 # ...
+
+for tex in first_ten:
+    with open(f"{tex.uuid}.jp2", "wb") as f:
+        f.write(tex.jpeg_2000())
+
 ```
 
 ## hacking
