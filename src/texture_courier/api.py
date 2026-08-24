@@ -85,8 +85,13 @@ class Texture(Entry):
         return self.head_size + body_size
 
     def codestream(self, *, verify: bool = True) -> bytes:
-        """Open the bare codestream as a bytes object"""
-        # the body runs to megabytes, so the entry gets its say before the read
+        """
+        Open the bare JPEG 2000 codestream as a bytes object.
+        
+        This is not intended to be used as a transfer or storage format
+        """
+
+        # sanity check before doing expensive reads
         if verify and not self.is_complete:
             raise self.__incomplete()
 
@@ -102,11 +107,17 @@ class Texture(Entry):
         return codestream
 
     def jpeg_2000(self, *, verify: bool = True) -> bytes:
-        """Wrap the codestream in a JPEG 2000 container"""
+        """
+        Put the codestream in a proper JPEG 2000 container.
+        
+        This format is intended for storage and transfer. Has a very minimal cost compared to the codestream,
+        but will have much better compatibility with other software.
+        """
+
         return wrap_jp2(self.codestream(verify=verify))
 
     def thumbnail_png(self) -> bytes | None:
-        """Encode the item's thumbnail as a png"""
+        """Encode the item's thumbnail (if any) as a PNG binary"""
 
         thumbnail = self.__read_thumbnail()
 
