@@ -274,8 +274,10 @@ class TextureCache:
                     body_path=texture_location(self.cache_dir, entry.uuid),
                 )
 
-        self.textures = {uuid: texture for uuid, texture in self.textures.items() if uuid in live}
-        self.textures |= changed_textures
+        textures = {uuid: texture for uuid, texture in self.textures.items() if uuid in live}
+        textures |= changed_textures
+
+        self.textures = textures
         self.__order = None
 
         return iter(changed_textures.values())
