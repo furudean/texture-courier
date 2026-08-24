@@ -15,6 +15,8 @@ from .core import (
     texture_location,
 )
 from .encode import (
+    EOC_MARKER,
+    SOC_MARKER,
     encode_png,
     wrap_jp2,
 )
@@ -57,23 +59,30 @@ class Texture(Entry):
         return f"<Texture {self.uuid}, {self.time}, {size}, whole={self.whole()}>"
 
     def whole(self) -> bool:
-        """Whether the cache claims to hold the whole image, head and body together
+        """Whether the cache claims to have the whole image downloaded
 
-        Only the entry's account of itself, which costs nothing to ask for.
-        Whether the bytes bear it out is settled when they are read.
+        Only the entry's account of itself, which does not necessarily reflect the actual state on disk.
         """
         return self.is_complete
 
     def __incomplete(self) -> TextureCacheError:
         return TextureCacheError(f"{self.uuid} holds {self.cached_size} of {self.image_size} bytes")
 
-    def __verify(self, head: bytes, body_size: int, tail: bytes) -> None:
-        """The one account of what a whole texture is, for whichever bytes the caller holds"""
+    def __verify(self, head: bytes, body_size: int, codestream: bytes) -> None:
         if not self.is_complete:
             raise self.__incomplete()
 
+        if len(head) != self.head_size:
+            raise TextureCacheError(f"{self.uuid} has a {len(head)} byte head, entry describes {self.head_size}")
+
         if body_size != self.body_size:
             raise TextureCacheError(f"{self.uuid} has a {body_size} byte body, entry describes {self.body_size}")
+
+        if not codestream.startswith(SOC_MARKER):
+            raise TextureCacheError(f"{self.uuid} does not open on a jpeg 2000 codestream")
+
+        if not codestream.endswith(EOC_MARKER):
+            raise TextureCacheError(f"{self.uuid} is missing the marker that ends a codestream")
 
     def fs_size(self) -> int:
         """Get the size of the texture file on disk"""
@@ -88,7 +97,7 @@ class Texture(Entry):
         """
         Open the bare JPEG 2000 codestream as a bytes object.
 
-        This is not intended to be used as a transfer or storage format
+        This is not intended to be used as a transfer or storage format.
         """
 
         # sanity check before doing expensive reads
