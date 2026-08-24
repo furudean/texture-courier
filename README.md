@@ -70,7 +70,6 @@ texture = cache.get("93ff0fc0-731a-b04e-8a66-b6489c059e04")
 
 with open(f"{texture.uuid}.jp2", "wb") as f:
     f.write(texture.loads_jp2())
-
 ```
 
 ## hacking

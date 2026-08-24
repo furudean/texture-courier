@@ -87,7 +87,7 @@ class Texture(Entry):
     def codestream(self, *, verify: bool = True) -> bytes:
         """
         Open the bare JPEG 2000 codestream as a bytes object.
-        
+
         This is not intended to be used as a transfer or storage format
         """
 
@@ -109,7 +109,7 @@ class Texture(Entry):
     def jpeg_2000(self, *, verify: bool = True) -> bytes:
         """
         Put the codestream in a proper JPEG 2000 container.
-        
+
         This format is intended for storage and transfer. Has a very minimal cost compared to the codestream,
         but will have much better compatibility with other software.
         """
