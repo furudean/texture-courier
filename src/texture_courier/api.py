@@ -239,17 +239,22 @@ class TextureCache:
         if entries_raw == self.__entries_raw:
             return iter(())
 
-        self.__entries_raw = entries_raw
-        self.__texture_entries_file = BytesIO(entries_raw)
-        self.header = Header.from_texture_entries(self.__texture_entries_file)
+        texture_entries_file = BytesIO(entries_raw)
+        header = Header.from_texture_entries(texture_entries_file)
 
-        self.entries = decode_texture_entries(
-            self.__texture_entries_file,
-            entry_count=self.header.entry_count,
+        entries = decode_texture_entries(
+            texture_entries_file,
+            entry_count=header.entry_count,
         )
 
-        self.__texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
+        texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
+
+        self.__entries_raw = entries_raw
+        self.__texture_entries_file = texture_entries_file
+        self.__texture_cache_file = texture_cache_file
         self.__fast_cache_file = None
+        self.header = header
+        self.entries = entries
 
         changed_textures: dict[str, Texture] = {}
         live: set[str] = set()
