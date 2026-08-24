@@ -138,8 +138,8 @@ class Texture(Entry):
 
 class TextureCache:
     cache_dir: Path
-    texture_entries_file: BytesIO
-    texture_cache_file: BytesIO
+    _texture_entries_file: BytesIO
+    _texture_cache_file: BytesIO
 
     header: Header
     entries: list[Entry]
@@ -216,7 +216,7 @@ class TextureCache:
     def __get_read_head(self, i: int, entry: Entry) -> Callable[[], bytes]:
         def read_head() -> bytes:
             # the slot is a fixed width, so trim the zero padding that follows
-            return read_texture_cache(self.texture_cache_file, i)[: entry.head_size]
+            return read_texture_cache(self._texture_cache_file, i)[: entry.head_size]
 
         return read_head
 
@@ -232,25 +232,19 @@ class TextureCache:
     def refresh(self) -> Iterator[Texture]:
         entries_raw = (self.cache_dir / "texture.entries").read_bytes()
 
-        # a running viewer writes this file constantly and most of those writes
-        # leave every entry saying what it said before. comparing the bytes
-        # costs a memcmp, decoding them to find out costs fifty thousand
-        # timestamps and uuids
         if entries_raw == self.__entries_raw:
             return iter(())
 
         self.__entries_raw = entries_raw
-        self.texture_entries_file = BytesIO(entries_raw)
-        self.header = Header.from_texture_entries(self.texture_entries_file)
+        self._texture_entries_file = BytesIO(entries_raw)
+        self.header = Header.from_texture_entries(self._texture_entries_file)
 
         self.entries = decode_texture_entries(
-            self.texture_entries_file,
+            self._texture_entries_file,
             entry_count=self.header.entry_count,
         )
 
-        # only worth reading once an entry has actually moved, it is the
-        # biggest file in the cache after the thumbnails
-        self.texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
+        self._texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
         self.__fast_cache_file = None
 
         changed_textures: dict[str, Texture] = {}
