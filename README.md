@@ -61,6 +61,8 @@ cache = TextureCache("/Users/meri/Library/Caches/Firestorm_x64/texturecache")
 # the api implements an iterator and __getitem__, so you can interact with it like a list
 texture = cache["93ff0fc0-731a-b04e-8a66-b6489c059e04"]
 
+# <Texture 93ff0fc0-731a-b04e-8a66-b6489c059e04, 2026-08-21 22:39:00, 20 KB, whole=True>
+
 with open(f"{texture.uuid}.jp2", "wb") as f:
     f.write(texture.jpeg_2000())
 
