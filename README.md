@@ -2,7 +2,9 @@
 
 # texture-courier
 
-simple CLI program and high-level python API to interact with the second life texture cache
+simple CLI program and high-level python API to interact with the second life texture cache.
+
+if you're looking for a end-user tool, you may be interested in [lltexturecache-browser-qt](https://github.com/furudean/lltexturecache-browser-qt).
 
 ## goals
 
@@ -47,7 +49,7 @@ this dumps the contents of the cache to a directory (by default, to
 
 see `texture-courier --help` for other options.
 
-## api
+## use API
 
 ```python
 from texture_courier import list_texture_caches, TextureCache
