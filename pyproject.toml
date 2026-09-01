@@ -1,6 +1,6 @@
 [project]
 name = "texture-courier"
-version = "0.0.14"
+version = "0.0.15"
 authors = [{ name = "meri", email = "meri@himawari.fun" }]
 description = "rips texture cache from second life viewers"
 readme = "README.md"
