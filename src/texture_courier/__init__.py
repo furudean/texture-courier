@@ -1,8 +1,7 @@
 from typing import Any
 
-from . import core
 from .api import Texture, TextureCache
-from .core import Entry, Header, TextureCacheError
+from .core import Entry, Header, TextureCacheError, Thumbnail
 from .find import list_texture_caches
 from .watch import Watch
 
@@ -12,8 +11,8 @@ __all__ = [
     "Texture",
     "TextureCache",
     "TextureCacheError",
+    "Thumbnail",
     "Watch",
-    "core",
     "list_texture_caches",
 ]
 

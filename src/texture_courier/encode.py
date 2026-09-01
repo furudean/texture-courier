@@ -1,7 +1,7 @@
 import struct
 import zlib
 
-from .core import TextureCacheError
+from .error import TextureCacheError
 
 # the cache stores bare jpeg2000 codestreams. a jp2 file is the same
 # codestream inside a handful of boxes, so it can be built without decoding

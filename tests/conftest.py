@@ -3,8 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from texture_courier.api import Texture, TextureCache
-from texture_courier.core import Thumbnail, read_fast_cache
+from texture_courier import Texture, TextureCache, Thumbnail
 from texture_courier.encode import codestream_size
 
 CACHE_DIR = Path(__file__).parent.parent / "fixtures" / "texturecache"
@@ -47,12 +46,12 @@ def thumbnails() -> list[tuple[Texture, Thumbnail]]:
     """Every thumbnail in the fixture cache, next to the texture it belongs to"""
     cache = load_cache()
 
-    assert cache.fast_cache_file is not None
+    assert cache.has_fastcache
 
     pairs = []
 
     for texture in cache:
-        thumbnail = read_fast_cache(cache.fast_cache_file, texture.index)
+        thumbnail = texture.thumbnail
 
         if thumbnail is not None:
             pairs.append((texture, thumbnail))

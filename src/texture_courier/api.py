@@ -1,4 +1,5 @@
 from collections.abc import Callable, Iterator
+from functools import cached_property
 from io import BytesIO
 from pathlib import Path
 from typing import Any, TypeVar, overload
@@ -19,7 +20,6 @@ from .core import (
 from .encode import (
     EOC_MARKER,
     SOC_MARKER,
-    encode_png,
     wrap_jp2,
 )
 from .util import format_bytes
@@ -126,15 +126,21 @@ class Texture(Entry):
 
         return wrap_jp2(self.codestream(verify=verify))
 
-    def thumbnail_png(self) -> bytes | None:
-        """Encode the item's thumbnail (if any) as a PNG binary"""
+    @cached_property
+    def thumbnail(self) -> Thumbnail | None:
+        """The thumbnail the cache keeps beside the texture, if it has one yet"""
 
-        thumbnail = self.__read_thumbnail()
+        return self.__read_thumbnail()
 
-        if thumbnail is None:
-            return None
+    def dimensions(self) -> tuple[int, int] | None:
+        """The dimensions the cache claims for the texture as (width, height)
 
-        return encode_png(thumbnail.width, thumbnail.height, thumbnail.components, thumbnail.pixels)
+        This reads the thumbnail into memory.
+        """
+
+        thumbnail = self.thumbnail
+
+        return None if thumbnail is None else thumbnail.source_dimensions
 
 
 class TextureCache:
@@ -206,12 +212,11 @@ class TextureCache:
         return f"<TextureCache {self.cache_dir.resolve()}, {len(self)} textures, {format_bytes(total_size)}>"
 
     @property
-    def fast_cache_file(self) -> BytesIO | None:
-        """FastCache.cache, read on first use, absent on caches written before it
+    def has_fastcache(self) -> bool:
+        """Whether the cache has a FastCache.cache to read thumbnails from"""
+        return self.__fast_cache() is not None
 
-        Bigger than the rest of the cache put together and untouched unless
-        somebody asks for a thumbnail, so refreshing does not pay for it.
-        """
+    def __fast_cache(self) -> BytesIO | None:
         if self.__fast_cache_file is None:
             path = self.cache_dir / "FastCache.cache"
             self.__fast_cache_file = loads_bytes_io(path) if path.is_file() else None
@@ -227,10 +232,12 @@ class TextureCache:
 
     def __get_read_thumbnail(self, i: int) -> Callable[[], Thumbnail | None]:
         def read_thumbnail() -> Thumbnail | None:
-            if self.fast_cache_file is None:
+            fast_cache = self.__fast_cache()
+
+            if fast_cache is None:
                 return None
 
-            return read_fast_cache(self.fast_cache_file, i)
+            return read_fast_cache(fast_cache, i)
 
         return read_thumbnail
 

@@ -77,6 +77,24 @@ for tex in first_ten:
         f.write(tex.jpeg_2000())
 ```
 
+### thumbnails
+
+the viewer keeps a small decoded copy of each texture in a `FastCache.cache`
+beside the cache. `texture.thumbnail` can read it
+
+```python
+thumb = cache[0].thumbnail
+
+# <Thumbnail 32x32, 3 components, discard 5>
+
+print(thumb.dimensions)         # (32, 32)
+
+with open(f"{tex.uuid}.png", "wb") as f:
+    f.write(thumb.png())
+```
+
+`thumb.pixels` holds the raw rows if you would rather encode them yourself.
+
 refer to the [api.py](src/texture_courier/api.py) file for additional methods and helpers.
 
 ## hacking

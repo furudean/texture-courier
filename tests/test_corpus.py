@@ -2,8 +2,7 @@ import pytest
 from conftest import sample_textures
 from spec import boxes, decode_png, parse_ihdr
 
-from texture_courier.api import Texture, TextureCache
-from texture_courier.core import Thumbnail
+from texture_courier import Texture, TextureCache, Thumbnail
 from texture_courier.encode import codestream_size, wrap_jp2
 
 SAMPLES = sample_textures()
@@ -15,12 +14,12 @@ def test_the_fixture_cache_is_worth_testing_against(
     """A cache that lost its interesting entries would pass everything below"""
     assert len(textures) > 100
     assert len(thumbnails) > 100
-    assert cache.fast_cache_file is not None
+    assert cache.has_fastcache
 
     # the two shapes worth having: more components than a colour space can
     # account for, and a thumbnail that is not the usual 16x16
     assert "5 components" in SAMPLES
-    assert {thumbnail.size for _, thumbnail in thumbnails} > {(16, 16)}
+    assert {thumbnail.dimensions for _, thumbnail in thumbnails} > {(16, 16)}
 
 
 @pytest.mark.parametrize("texture", SAMPLES.values(), ids=SAMPLES.keys())
@@ -55,11 +54,7 @@ def test_wrapping_costs_a_header_and_nothing_else(textures: list[Texture]) -> No
 
 def test_every_thumbnail_encodes(thumbnails: list[tuple[Texture, Thumbnail]]) -> None:
     for texture, thumbnail in thumbnails:
-        encoded = texture.thumbnail_png()
-
-        assert encoded is not None, texture.uuid
-
-        png = decode_png(encoded)
+        png = decode_png(thumbnail.png())
 
         assert (png.width, png.height, png.components) == (
             thumbnail.width,
@@ -67,3 +62,13 @@ def test_every_thumbnail_encodes(thumbnails: list[tuple[Texture, Thumbnail]]) ->
             thumbnail.components,
         ), texture.uuid
         assert b"".join(reversed(png.rows)) == thumbnail.pixels, texture.uuid
+
+
+def test_every_thumbnail_says_what_it_was_reduced_from(thumbnails: list[tuple[Texture, Thumbnail]]) -> None:
+    for texture, thumbnail in thumbnails:
+        width, height = thumbnail.source_dimensions
+
+        # a discard level is a count of halvings, so the size it came from is
+        # the size it is, doubled that many times and never smaller
+        assert (width, height) >= thumbnail.dimensions, texture.uuid
+        assert (width >> thumbnail.discard_level, height >> thumbnail.discard_level) == thumbnail.dimensions, texture.uuid

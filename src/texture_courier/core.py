@@ -6,6 +6,8 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Self
 
+from .encode import encode_png
+from .error import TextureCacheError
 from .util import format_bytes
 
 HEADER_STRUCT_FORMAT = "fI32sI"
@@ -24,10 +26,10 @@ FAST_CACHE_STRUCT_FORMAT = "4i"
 FAST_CACHE_HEADER_BYTE_COUNT = 16
 FAST_CACHE_DATA_BYTE_COUNT = 16 * 16 * 4
 FAST_CACHE_BYTE_COUNT = FAST_CACHE_HEADER_BYTE_COUNT + FAST_CACHE_DATA_BYTE_COUNT
-
-
-class TextureCacheError(Exception):
-    """Cache not laid out the way this program expects"""
+# a discard level counts halvings, so this stands for a texture a thousand
+# times wider than any the viewer will load. not a viewer constant, only a
+# bound past which the number is junk left in the slot rather than a level
+FAST_CACHE_MAX_DISCARD_LEVEL = 16
 
 
 def format_uuid(b: bytes) -> str:
@@ -180,8 +182,17 @@ class Thumbnail:
         return f"<Thumbnail {self.width}x{self.height}, {self.components} components, discard {self.discard_level}>"
 
     @property
-    def size(self) -> tuple[int, int]:
+    def dimensions(self) -> tuple[int, int]:
         return self.width, self.height
+
+    @property
+    def source_dimensions(self) -> tuple[int, int]:
+        """The dimensions the cache claims for the texture this was reduced from as (width, height)"""
+        return self.width << self.discard_level, self.height << self.discard_level
+
+    def png(self) -> bytes:
+        """Encode the thumbnail as a PNG binary"""
+        return encode_png(self.width, self.height, self.components, self.pixels)
 
     @classmethod
     def from_bytes(cls, b: bytes) -> Self | None:
@@ -193,7 +204,13 @@ class Thumbnail:
         # a slot that cannot describe an image was never written to. the
         # thumbnails are not all 16x16, tall and narrow textures keep their
         # aspect ratio, so only the total has to fit
-        if width <= 0 or height <= 0 or not 0 < components <= 4 or pixel_count > FAST_CACHE_DATA_BYTE_COUNT:
+        if (
+            width <= 0
+            or height <= 0
+            or not 0 < components <= 4
+            or pixel_count > FAST_CACHE_DATA_BYTE_COUNT
+            or not 0 <= discard_level <= FAST_CACHE_MAX_DISCARD_LEVEL
+        ):
             return None
 
         # unlike texture.cache, the rest of the slot is not zeroed, it is

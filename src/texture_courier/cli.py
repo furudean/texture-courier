@@ -192,12 +192,12 @@ def save_thumbnail(texture: Texture, output_dir: Path, args: Args) -> Path:
     if save_path.exists() and not args.force:
         raise FileExistsError
 
-    png = texture.thumbnail_png()
+    thumbnail = texture.thumbnail
 
-    if png is None:
+    if thumbnail is None:
         raise TextureEmptyError
 
-    save_path.write_bytes(png)
+    save_path.write_bytes(thumbnail.png())
 
     os.utime(save_path, (texture.time.timestamp(), texture.time.timestamp()))
 
@@ -275,7 +275,7 @@ def main() -> None:
 
     args.output_dir.mkdir(exist_ok=True)
 
-    if args.thumb and cache.fast_cache_file is None:
+    if args.thumb and not cache.has_fastcache:
         print("error: this cache has no FastCache.cache to read thumbnails from")
         sys.exit(1)
 
