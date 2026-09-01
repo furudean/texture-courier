@@ -12,7 +12,6 @@ __all__ = [
     "TextureCache",
     "TextureCacheError",
     "Watch",
-    "encode",
     "list_texture_caches",
 ]
 
