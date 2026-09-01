@@ -5,7 +5,6 @@ from hypothesis import given
 from hypothesis import strategies as st
 from spec import JP2_SIGNATURE, boxes, codestream, iter_boxes, parse_cdef, parse_colr, parse_ihdr
 
-from texture_courier.core import TextureCacheError
 from texture_courier.encode import (
     CDEF_TYPE_COLOR,
     CDEF_TYPE_OPACITY,
@@ -14,6 +13,7 @@ from texture_courier.encode import (
     ENUM_CS_SRGB,
     wrap_jp2,
 )
+from texture_courier.error import TextureCacheError
 
 
 def jp2h(jp2: bytes) -> dict[bytes, bytes]:

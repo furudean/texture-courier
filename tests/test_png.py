@@ -5,8 +5,8 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from spec import decode_png, iter_chunks
 
-from texture_courier.core import TextureCacheError
 from texture_courier.encode import encode_png
+from texture_courier.error import TextureCacheError
 
 
 def rows(width: int, height: int, components: int) -> list[bytes]:

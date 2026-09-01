@@ -9,7 +9,6 @@ from .core import (
     HEADER_BYTE_COUNT,
     Entry,
     Header,
-    TextureCacheError,
     Thumbnail,
     decode_texture_entries,
     read_fast_cache,
@@ -22,6 +21,7 @@ from .encode import (
     SOC_MARKER,
     wrap_jp2,
 )
+from .error import TextureCacheError
 from .util import format_bytes
 from .watch import DEBOUNCE_SECONDS, Watch
 

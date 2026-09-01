@@ -7,7 +7,7 @@ from typing import Literal
 from tqdm import tqdm
 
 from .api import Texture, TextureCache
-from .core import TextureCacheError
+from .error import TextureCacheError
 from .find import find_texturecache, list_texture_caches
 from .signal import interrupthandler
 

@@ -7,7 +7,7 @@ from collections.abc import Callable
 from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Self
 
-from .core import TextureCacheError
+from .error import TextureCacheError
 
 if TYPE_CHECKING:
     from watchdog.events import FileSystemEvent, FileSystemEventHandler
