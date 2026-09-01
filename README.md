@@ -87,7 +87,7 @@ thumb = cache[0].thumbnail
 
 # <Thumbnail 32x32, 3 components, discard 5>
 
-print(thumb.dimensions)         # (32, 32)
+print(thumb.dimensions)  # (32, 32)
 
 with open(f"{tex.uuid}.png", "wb") as f:
     f.write(thumb.png())
