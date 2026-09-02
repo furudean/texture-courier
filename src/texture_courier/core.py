@@ -82,9 +82,9 @@ class Header:
         expected = HEADER_BYTE_COUNT + header.entry_count * ENTRY_BYTE_COUNT
         actual = texture_entries.getbuffer().nbytes
 
-        if actual != expected:
+        if actual < expected:
             raise TextureCacheError(
-                f"texture.entries is {actual} bytes, expected {expected} for {header.entry_count} entries"
+                f"texture.entries is {actual} bytes, expected at least {expected} for {header.entry_count} entries"
             )
 
         return header
