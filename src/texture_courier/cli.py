@@ -2,16 +2,11 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Literal
-
-from tqdm import tqdm
 
 from .api import Texture, TextureCache
 from .error import TextureCacheError
 from .find import find_texturecache, list_texture_caches
 from .signal import interrupthandler
-
-OutputMode = Literal["progress", "files", "debug"]
 
 
 class TextureError(Exception):
@@ -29,7 +24,8 @@ class TextureIncompleteError(TextureError):
 class Args(argparse.Namespace):
     cache_dir: Path | None
     output_dir: Path
-    output_mode: OutputMode
+    debug: bool
+    quiet: bool
     force: bool
     raw: bool
     skip_integrity: bool
@@ -98,12 +94,21 @@ def parse_args() -> Args:
         default="./texturecache",
     )
 
-    parser.add_argument(
-        "--output-mode",
-        "-O",
-        choices=("progress", "files", "debug"),
-        help="specify output mode. 'progress' shows a progress bar, 'files' prints the path of each file",
-        default="progress",
+    verbosity = parser.add_mutually_exclusive_group()
+
+    verbosity.add_argument(
+        "--debug",
+        action="store_true",
+        help="show debug logging",
+        default=False,
+    )
+
+    verbosity.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="don't print anything",
+        default=False,
     )
 
     parser.add_argument(
@@ -191,17 +196,6 @@ def save_thumbnail(texture: Texture, output_dir: Path, args: Args) -> Path:
     return save_path
 
 
-def print_text_frame(string_lst: list[str], width: int | None = None) -> None:
-    if width is None:
-        width = max(len(line) for line in string_lst) + 4
-
-    g_line = "+{}+".format("-" * (width - 2))
-    print(g_line)
-    for line in string_lst:
-        print("| {0:<{1}} |".format(line, width - 4))
-    print(g_line)
-
-
 def end(
     *,
     args: Args,
@@ -211,22 +205,22 @@ def end(
     error_write_textures: int,
     empty_textures: int,
 ) -> None:
-    if args.output_mode in ("progress", "debug"):
-        s = [f"wrote {good_writes} textures to {args.output_dir.resolve()}"]
+    s = [f"wrote {good_writes:,} textures to {args.output_dir.resolve()}"]
 
-        if existing_textures:
-            s.append(f"skipped {existing_textures} existing textures")
+    if existing_textures:
+        s.append(f"skipped {existing_textures:,} existing textures")
 
-        if incomplete_textures:
-            s.append(f"skipped {incomplete_textures} incomplete textures")
-        if error_write_textures:
-            s.append(f"{error_write_textures} incomplete/invalid textures not saved")
+    if incomplete_textures:
+        s.append(f"skipped {incomplete_textures:,} incomplete textures")
+    if error_write_textures:
+        s.append(f"{error_write_textures:,} incomplete/invalid textures not saved")
 
-        if empty_textures:
-            s.append(f"skipped {empty_textures} empty textures")
+    if empty_textures:
+        s.append(f"skipped {empty_textures:,} empty textures")
 
-        print("\n")
-        print_text_frame(s)
+    print()
+    for line in s:
+        print(line)
 
 
 def main() -> None:
@@ -239,10 +233,6 @@ def main() -> None:
             print(f"error: no texture cache found at {args.cache_dir.resolve()}")
             sys.exit(1)
     else:
-        if args.output_mode == "files":
-            print("error: output mode 'files' requires a cache directory")
-            sys.exit(1)
-
         cache_dir = prompt_for_cache_dir()
 
     try:
@@ -253,7 +243,7 @@ def main() -> None:
 
     good_writes = 0
 
-    if args.output_mode == "debug":
+    if args.debug:
         print()
         print("TEXTURE ENTRIES HEADER:")
 
@@ -272,57 +262,57 @@ def main() -> None:
     error_write_textures = 0
     incomplete_textures = 0
     existing_textures = 0
+    total = len(cache)
+    progress_width = len(f"{total:,}/{total:,}")
 
-    with (
-        interrupthandler() as h,
-        tqdm(
-            total=len(cache),
-            desc="extracting textures",
-            unit="tex",
-            delay=1,
-            disable=args.output_mode != "progress",
-        ) as progress,
-    ):
-        for texture in cache:
+    with interrupthandler() as h:
+        for i, texture in enumerate(cache, start=1):
             if h.interrupted:
-                progress.close()
                 break
+
+            if not args.debug and not args.quiet:
+                print(f"\r{f'{i:,}/{total:,}':<{progress_width}}", end="", flush=True)
 
             try:
                 save_path = save(texture, output_dir=args.output_dir, args=args)
                 good_writes += 1
 
-                if args.output_mode in ("files", "debug"):
-                    print(save_path.resolve())
+                if args.debug:
+                    print(f"{texture!r} -> {save_path.resolve()}")
             except TextureEmptyError:
                 empty_textures += 1
-            except TextureIncompleteError:
+
+                if args.debug:
+                    print(f"{texture!r} skipped, empty")
+            except TextureIncompleteError as e:
                 incomplete_textures += 1
+
+                if args.debug:
+                    print(f"{texture!r} skipped, incomplete: {e}")
             except FileExistsError:
                 existing_textures += 1
-            except Exception:  # noqa: BLE001
+
+                if args.debug:
+                    print(f"{texture!r} skipped, already exists")
+            except Exception as e:  # noqa: BLE001
                 error_write_textures += 1
 
-            postfix = {
-                "ok": good_writes,
-                "existing": existing_textures,
-                "incomplete": incomplete_textures,
-                "error": error_write_textures,
-                "empty": empty_textures,
-            }
+                if args.debug:
+                    print(f"{texture!r} failed: {e!r}")
 
-            progress.update()
-            progress.set_postfix({k: v for k, v in postfix.items() if v})
+        if not args.debug and not args.quiet:
+            print(f"\r{' ' * progress_width}\r", end="")
 
-        end(
-            args=args,
-            good_writes=good_writes,
-            incomplete_textures=incomplete_textures,
-            existing_textures=existing_textures,
-            error_write_textures=error_write_textures,
-            empty_textures=empty_textures,
-        )
+        if not args.quiet:
+            end(
+                args=args,
+                good_writes=good_writes,
+                incomplete_textures=incomplete_textures,
+                existing_textures=existing_textures,
+                error_write_textures=error_write_textures,
+                empty_textures=empty_textures,
+            )
 
-        if args.output_mode == "files" and good_writes == 0:
+        if good_writes == 0:
             print("warning: no textures were written")
             sys.exit(73)

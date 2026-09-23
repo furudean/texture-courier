@@ -12,10 +12,6 @@ classifiers = [
 license = "MIT"
 dependencies = []
 
-[project.optional-dependencies]
-# everything the command line program can do
-cli = ["tqdm>=4"]
-
 [dependency-groups]
 dev = [
   "ruff>=0.16.3",
@@ -23,7 +19,6 @@ dev = [
   "pytest>=8",
   "hypothesis>=6",
   "types-setuptools",
-  "types-tqdm>=4",
 ]
 
 [tool.setuptools.package-data]
