@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import time
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from .api import Texture, TextureCache
@@ -32,6 +33,7 @@ class Args(argparse.Namespace):
     raw: bool
     skip_integrity: bool
     thumb: bool
+    jobs: int | None
 
 
 def prompt_for_cache_dir() -> Path:
@@ -135,6 +137,14 @@ def parse_args() -> Args:
         action="store_true",
         help="skip integrity checks",
         default=False,
+    )
+
+    parser.add_argument(
+        "--jobs",
+        "-j",
+        type=int,
+        help="number of textures to read and write at once. if unset, will guess",
+        default=None,
     )
 
     output_format.add_argument(
@@ -272,21 +282,29 @@ def main() -> None:
     incomplete_textures = 0
     existing_textures = 0
     bytes_written = 0
-    total = len(cache)
+    textures = list(cache)
+    total = len(textures)
     progress_width = len(f"{total:,}/{total:,}")
 
     start_time = time.monotonic()
 
-    with interrupthandler() as h:
-        for i, texture in enumerate(cache, start=1):
+    with interrupthandler() as h, ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        futures: dict[Future[Path], Texture] = {
+            pool.submit(save, texture, output_dir=args.output_dir, args=args): texture for texture in textures
+        }
+
+        for i, future in enumerate(as_completed(futures), start=1):
             if h.interrupted:
+                pool.shutdown(wait=False, cancel_futures=True)
                 break
+
+            texture = futures[future]
 
             if not args.debug and not args.quiet:
                 print(f"\r{f'{i:,}/{total:,}':<{progress_width}}", end="", flush=True)
 
             try:
-                save_path = save(texture, output_dir=args.output_dir, args=args)
+                save_path = future.result()
                 good_writes += 1
                 bytes_written += save_path.stat().st_size
 
