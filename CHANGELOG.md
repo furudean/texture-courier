@@ -1,5 +1,9 @@
 # Changelog
 
+## unreleased
+
+- cli: change extraction text
+
 ## v0.1.0 - 2026-09-23
 
 - cli: read and decode textures on multiple threads for faster cache dumps

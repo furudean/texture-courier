@@ -208,6 +208,10 @@ def save_thumbnail(texture: Texture, output_dir: Path, args: Args) -> Path:
     return save_path
 
 
+def progress_line(i: int, total: int) -> str:
+    return f"extracting texture {i:,}/{total:,}"
+
+
 def end(
     *,
     args: Args,
@@ -284,7 +288,7 @@ def main() -> None:
     bytes_written = 0
     textures = list(cache)
     total = len(textures)
-    progress_width = len(f"{total:,}/{total:,}")
+    progress_width = len(progress_line(total, total))
 
     start_time = time.monotonic()
 
@@ -301,7 +305,7 @@ def main() -> None:
             texture = futures[future]
 
             if not args.debug and not args.quiet:
-                print(f"\r{f'{i:,}/{total:,}':<{progress_width}}", end="", flush=True)
+                print(f"\r{progress_line(i, total):<{progress_width}}", end="", flush=True)
 
             try:
                 save_path = future.result()
