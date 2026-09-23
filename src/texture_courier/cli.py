@@ -1,13 +1,14 @@
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 
 from .api import Texture, TextureCache
 from .error import TextureCacheError
 from .find import find_texturecache, list_texture_caches
 from .signal import interrupthandler
-from .util import format_bytes
+from .util import format_bytes, format_duration
 
 
 class TextureError(Exception):
@@ -206,8 +207,14 @@ def end(
     incomplete_textures: int,
     error_write_textures: int,
     empty_textures: int,
+    elapsed: float,
 ) -> None:
-    s = [f"wrote {good_writes:,} textures ({format_bytes(bytes_written)}) to {args.output_dir.resolve()}"]
+    s = [
+        (
+            f"wrote {good_writes:,} textures ({format_bytes(bytes_written)}) "
+            f"to {args.output_dir.resolve()} in {format_duration(elapsed)}"
+        )
+    ]
 
     if existing_textures:
         s.append(f"skipped {existing_textures:,} existing textures")
@@ -268,6 +275,8 @@ def main() -> None:
     total = len(cache)
     progress_width = len(f"{total:,}/{total:,}")
 
+    start_time = time.monotonic()
+
     with interrupthandler() as h:
         for i, texture in enumerate(cache, start=1):
             if h.interrupted:
@@ -316,6 +325,7 @@ def main() -> None:
                 existing_textures=existing_textures,
                 error_write_textures=error_write_textures,
                 empty_textures=empty_textures,
+                elapsed=time.monotonic() - start_time,
             )
 
         if good_writes == 0:

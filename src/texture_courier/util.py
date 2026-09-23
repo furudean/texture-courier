@@ -11,3 +11,12 @@ def format_bytes(size: float) -> str:
         n += 1
 
     return f"{math.ceil(size)} {power_labels[n]}"
+
+
+def format_duration(seconds: float) -> str:
+    minutes, seconds = divmod(round(seconds), 60)
+
+    if minutes:
+        return f"{minutes}m {seconds}s"
+
+    return f"{seconds}s"
