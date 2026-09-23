@@ -27,6 +27,7 @@ texture_courier = ["py.typed"]
 [project.urls]
 Homepage = "https://github.com/furudean/texture-courier"
 Issues = "https://github.com/furudean/texture-courier/issues"
+Changelog = "https://github.com/furudean/texture-courier/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["setuptools", "wheel", "build"]
