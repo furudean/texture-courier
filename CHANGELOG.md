@@ -1,6 +1,6 @@
 # Changelog
 
-## unreleased
+## v0.1.0 - 2026-09-23
 
 - cli: read and decode textures on multiple threads for faster cache dumps
 - cli: more precise elapsed-time output, plus a total bytes-written summary on completion
