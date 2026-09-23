@@ -14,9 +14,10 @@ def format_bytes(size: float) -> str:
 
 
 def format_duration(seconds: float) -> str:
-    minutes, seconds = divmod(round(seconds), 60)
+    minutes, secs = divmod(round(seconds, 1), 60)
+    minutes = int(minutes)
 
     if minutes:
-        return f"{minutes}m {seconds}s"
+        return f"{minutes}m {round(secs)}s"
 
-    return f"{seconds}s"
+    return f"{secs:.1f}s"
