@@ -7,6 +7,7 @@ from .api import Texture, TextureCache
 from .error import TextureCacheError
 from .find import find_texturecache, list_texture_caches
 from .signal import interrupthandler
+from .util import format_bytes
 
 
 class TextureError(Exception):
@@ -200,12 +201,13 @@ def end(
     *,
     args: Args,
     good_writes: int,
+    bytes_written: int,
     existing_textures: int,
     incomplete_textures: int,
     error_write_textures: int,
     empty_textures: int,
 ) -> None:
-    s = [f"wrote {good_writes:,} textures to {args.output_dir.resolve()}"]
+    s = [f"wrote {good_writes:,} textures ({format_bytes(bytes_written)}) to {args.output_dir.resolve()}"]
 
     if existing_textures:
         s.append(f"skipped {existing_textures:,} existing textures")
@@ -262,6 +264,7 @@ def main() -> None:
     error_write_textures = 0
     incomplete_textures = 0
     existing_textures = 0
+    bytes_written = 0
     total = len(cache)
     progress_width = len(f"{total:,}/{total:,}")
 
@@ -276,6 +279,7 @@ def main() -> None:
             try:
                 save_path = save(texture, output_dir=args.output_dir, args=args)
                 good_writes += 1
+                bytes_written += save_path.stat().st_size
 
                 if args.debug:
                     print(f"{texture!r} -> {save_path.resolve()}")
@@ -307,6 +311,7 @@ def main() -> None:
             end(
                 args=args,
                 good_writes=good_writes,
+                bytes_written=bytes_written,
                 incomplete_textures=incomplete_textures,
                 existing_textures=existing_textures,
                 error_write_textures=error_write_textures,
