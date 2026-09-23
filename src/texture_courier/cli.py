@@ -30,15 +30,10 @@ class Args(argparse.Namespace):
     cache_dir: Path | None
     output_dir: Path
     output_mode: OutputMode
-    watch: bool
     force: bool
     raw: bool
     skip_integrity: bool
     thumb: bool
-
-
-def clear_screen() -> None:
-    os.system("cls" if os.name == "nt" else "clear")
 
 
 def prompt_for_cache_dir() -> Path:
@@ -109,14 +104,6 @@ def parse_args() -> Args:
         choices=("progress", "files", "debug"),
         help="specify output mode. 'progress' shows a progress bar, 'files' prints the path of each file",
         default="progress",
-    )
-
-    parser.add_argument(
-        "--watch",
-        "-w",
-        action="store_true",
-        help="watch the cache directory, extracting textures as the viewer writes them",
-        default=False,
     )
 
     parser.add_argument(
@@ -281,112 +268,10 @@ def main() -> None:
 
     save = save_thumbnail if args.thumb else save_texture
 
-    if args.watch:
-        incomplete_stack: set[str] = set()
-        failed_stack: set[str] = set()
-        empty_stack: set[str] = set()
-        existing_stack: set[str] = set()
-
-        def handler(modified_textures: list[Texture]) -> None:
-            nonlocal good_writes
-
-            for texture in modified_textures:
-                save_path: Path | None = None
-
-                try:
-                    save_path = save(
-                        texture,
-                        output_dir=args.output_dir,
-                        args=args,
-                    )
-
-                    good_writes += 1
-                    empty_stack.discard(texture.uuid)
-                    failed_stack.discard(texture.uuid)
-                    incomplete_stack.discard(texture.uuid)
-                except TextureEmptyError:
-                    empty_stack.add(texture.uuid)
-                except FileExistsError:
-                    existing_stack.add(texture.uuid)
-                    failed_stack.discard(texture.uuid)
-                except TextureIncompleteError:
-                    incomplete_stack.add(texture.uuid)
-                except Exception as e:  # noqa: BLE001
-                    # a texture the viewer is midway through writing shouldn't
-                    # stop the rest of the batch from being written
-                    failed_stack.add(texture.uuid)
-
-                    if args.output_mode == "debug":
-                        print(f"error writing {texture.uuid}: {e}")
-
-                if args.output_mode == "progress":
-                    printstr = [f"{good_writes} textures extracted"]
-
-                    if len(incomplete_stack):
-                        printstr.append(f"{len(incomplete_stack)} incomplete")
-
-                    if len(failed_stack):
-                        printstr.append(f"{len(failed_stack)} incomplete/failed")
-
-                    if len(existing_stack):
-                        printstr.append(f"{len(existing_stack)} existing skipped")
-
-                    if len(empty_stack):
-                        printstr.append(f"{len(empty_stack)} empty skipped")
-
-                    print(", ".join(printstr), end="\r", flush=True)
-
-                if args.output_mode in ("files", "debug") and save_path:
-                    print(save_path.resolve())
-
-        def on_error(error: Exception) -> None:
-            # torn reads of a cache the viewer is midway through writing are
-            # ordinary, and the next event reads it properly
-                if args.output_mode in ("progress", "debug"):
-                    print(f"error reading cache: {error}")
-
-        try:
-            watch = cache.watch(handler, on_error=on_error)
-        except ImportError as e:
-            # if cli installed without watcher extra, most likely
-            print(f"error: {e}")
-            sys.exit(1)
-
-        clear_screen()
-
-        if args.output_mode in ("progress", "debug"):
-            print(f"watching for changes in {cache.cache_dir.resolve()}")
-            print(f"extracting to {args.output_dir.resolve()}")
-            print()
-            print("input ctrl+c to stop")
-            print()
-
-        with interrupthandler() as h, watch:
-            try:
-                while watch.is_alive() and not h.interrupted:
-                    watch.join(1)
-            except KeyboardInterrupt:
-                pass
-
-            end(
-                args=args,
-                good_writes=good_writes,
-                existing_textures=len(existing_stack),
-                incomplete_textures=len(incomplete_stack),
-                error_write_textures=len(failed_stack),
-                empty_textures=len(empty_stack),
-            )
-
-            if not h.interrupted:
-                sys.exit(74)
-
-            sys.exit(130)
-
-    else:
-        empty_textures = 0
-        error_write_textures = 0
-        incomplete_textures = 0
-        existing_textures = 0
+    empty_textures = 0
+    error_write_textures = 0
+    incomplete_textures = 0
+    existing_textures = 0
 
     with (
         interrupthandler() as h,

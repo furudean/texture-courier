@@ -2,7 +2,7 @@ from collections.abc import Callable, Iterator
 from functools import cached_property
 from io import BytesIO
 from pathlib import Path
-from typing import Any, TypeVar, overload
+from typing import TypeVar, overload
 
 from .core import (
     ENTRY_BYTE_COUNT,
@@ -23,7 +23,6 @@ from .encode import (
 )
 from .error import TextureCacheError
 from .util import format_bytes
-from .watch import DEBOUNCE_SECONDS, Watch
 
 T = TypeVar("T")
 
@@ -351,19 +350,6 @@ class TextureCache:
         self.__order = None
 
         return iter(changed_textures.values())
-
-    def watch(
-        self,
-        handler: Callable[[list[Texture]], Any],
-        *,
-        on_error: Callable[[Exception], Any] | None = None,
-        debounce: float = DEBOUNCE_SECONDS,
-    ) -> Watch:
-        """Watch the cache directory for changes and call handler function on updates.
-
-        Requires texture-courier[watcher] extra to function
-        """
-        return Watch(self, handler, on_error=on_error, debounce=debounce)
 
     @overload
     def get(self, uuid: str) -> Texture | None: ...

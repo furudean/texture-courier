@@ -4,7 +4,6 @@ from .api import Texture, TextureCache
 from .core import Entry, Header, Thumbnail
 from .error import TextureCacheError
 from .find import list_texture_caches
-from .watch import Watch
 
 __all__ = [
     "Entry",
@@ -13,7 +12,6 @@ __all__ = [
     "TextureCache",
     "TextureCacheError",
     "Thumbnail",
-    "Watch",
     "list_texture_caches",
 ]
 
