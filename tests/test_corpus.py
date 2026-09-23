@@ -71,4 +71,6 @@ def test_every_thumbnail_says_what_it_was_reduced_from(thumbnails: list[tuple[Te
         # a discard level is a count of halvings, so the size it came from is
         # the size it is, doubled that many times and never smaller
         assert (width, height) >= thumbnail.dimensions, texture.uuid
-        assert (width >> thumbnail.discard_level, height >> thumbnail.discard_level) == thumbnail.dimensions, texture.uuid
+        assert (width >> thumbnail.discard_level, height >> thumbnail.discard_level) == thumbnail.dimensions, (
+            texture.uuid
+        )
