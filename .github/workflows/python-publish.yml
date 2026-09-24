@@ -43,4 +43,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           ./scripts/changelog-notes.sh "$GITHUB_REF_NAME" >release-notes.md
-          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file release-notes.md dist/*
