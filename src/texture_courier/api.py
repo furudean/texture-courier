@@ -6,12 +6,9 @@ from typing import TypeVar, overload
 
 from .core import (
     ENTRY_BYTE_COUNT,
-    FAST_CACHE_BYTE_COUNT,
     HEADER_BYTE_COUNT,
-    TEXTURE_CACHE_BYTE_COUNT,
     Entry,
     Header,
-    LiveSlots,
     Thumbnail,
     decode_texture_entries,
     read_fast_cache,
@@ -30,6 +27,10 @@ from .util import format_bytes
 T = TypeVar("T")
 
 DIFF_BLOCK_BYTE_COUNT = 4096
+
+
+def loads_bytes_io(p: Path) -> BytesIO:
+    return BytesIO(p.read_bytes())
 
 
 class Texture(Entry):
@@ -149,8 +150,9 @@ class TextureCache:
     textures: dict[str, Texture]
 
     __entries_raw: bytes
-    __texture_cache: LiveSlots
-    __fast_cache: LiveSlots
+    __texture_entries_file: BytesIO
+    __texture_cache_file: BytesIO | None
+    __fast_cache_file: BytesIO | None
     __order: list[Texture] | None
 
     def __init__(self, cache_dir: str | Path):
@@ -158,6 +160,8 @@ class TextureCache:
         self.entries = []
         self.textures = {}
         self.__entries_raw = b""
+        self.__texture_cache_file = None
+        self.__fast_cache_file = None
         self.__order = None
 
         if (
@@ -211,24 +215,34 @@ class TextureCache:
     def has_fastcache(self) -> bool:
         return (self.cache_dir / "FastCache.cache").is_file()
 
-    def __live_slots(self, name: str, slot_size: int) -> LiveSlots:
-        textures = self.textures
+    def __fast_cache(self) -> BytesIO | None:
+        if self.__fast_cache_file is None:
+            path = self.cache_dir / "FastCache.cache"
+            self.__fast_cache_file = loads_bytes_io(path) if path.is_file() else None
 
-        return LiveSlots(self.cache_dir / name, slot_size, lambda: (texture.index for texture in textures.values()))
+        return self.__fast_cache_file
+
+    def __texture_cache(self) -> BytesIO:
+        if self.__texture_cache_file is None:
+            self.__texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
+
+        return self.__texture_cache_file
 
     def __get_read_head(self, i: int, entry: Entry) -> Callable[[], bytes]:
         def read_head() -> bytes:
             # the slot is a fixed width, so trim the zero padding that follows
-            return read_texture_cache(self.__texture_cache, i)[: entry.head_size]
+            return read_texture_cache(self.__texture_cache(), i)[: entry.head_size]
 
         return read_head
 
     def __get_read_thumbnail(self, i: int) -> Callable[[], Thumbnail | None]:
         def read_thumbnail() -> Thumbnail | None:
-            try:
-                return read_fast_cache(self.__fast_cache, i)
-            except FileNotFoundError:
+            fast_cache = self.__fast_cache()
+
+            if fast_cache is None:
                 return None
+
+            return read_fast_cache(fast_cache, i)
 
         return read_thumbnail
 
@@ -322,6 +336,9 @@ class TextureCache:
                     changed_textures[entry.uuid] = self.__texture(i, entry)
 
         self.__entries_raw = entries_raw
+        self.__texture_entries_file = texture_entries_file
+        self.__texture_cache_file = None
+        self.__fast_cache_file = None
         self.header = header
         self.entries = entries
 
@@ -335,8 +352,6 @@ class TextureCache:
 
         self.textures = textures
         self.__order = None
-        self.__texture_cache = self.__live_slots("texture.cache", TEXTURE_CACHE_BYTE_COUNT)
-        self.__fast_cache = self.__live_slots("FastCache.cache", FAST_CACHE_BYTE_COUNT)
 
         return iter(changed_textures.values())
 

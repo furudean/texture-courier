@@ -1,10 +1,9 @@
 import struct
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Iterator
 from datetime import datetime
 from functools import total_ordering
 from io import BytesIO
 from pathlib import Path
-from threading import Lock
 from typing import Any, Self
 
 from .encode import encode_png
@@ -227,46 +226,11 @@ class Thumbnail:
         )
 
 
-def read_slots(path: Path, slot_size: int, indices: Iterable[int]) -> dict[int, bytes]:
-    slots = {}
-
-    with open(path, "rb") as f:
-        for n in sorted(indices):
-            f.seek(slot_size * n)
-            slots[n] = f.read(slot_size)
-
-    return slots
-
-
-class LiveSlots:
-    path: Path
-    slot_size: int
-
-    def __init__(self, path: Path, slot_size: int, indices: Callable[[], Iterable[int]]):
-        self.path = path
-        self.slot_size = slot_size
-        self.__indices = indices
-        self.__slots: dict[int, bytes] | None = None
-        self.__lock = Lock()
-
-    def __getitem__(self, n: int) -> bytes:
-        if self.__slots is None:
-            with self.__lock:
-                if self.__slots is None:
-                    self.__slots = read_slots(self.path, self.slot_size, self.__indices())
-
-        slot = self.__slots.get(n)
-
-        # a texture kept from before a refresh can point outside the pass
-        if slot is None:
-            slot = read_slots(self.path, self.slot_size, [n])[n]
-
-        return slot
-
-
-def read_fast_cache(fast_cache: LiveSlots, n: int) -> Thumbnail | None:
+def read_fast_cache(fast_cache: BytesIO, n: int) -> Thumbnail | None:
     offset = FAST_CACHE_BYTE_COUNT * n
-    raw = fast_cache[n]
+
+    fast_cache.seek(offset)
+    raw = fast_cache.read(FAST_CACHE_BYTE_COUNT)
 
     if len(raw) != FAST_CACHE_BYTE_COUNT:
         raise TextureCacheError(
@@ -296,12 +260,15 @@ def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[E
     ]
 
 
-def read_texture_cache(texture_cache: LiveSlots, n: int) -> bytes:
+def read_texture_cache(texture_cache: BytesIO, n: int) -> bytes:
     offset = TEXTURE_CACHE_BYTE_COUNT * n
-    head = texture_cache[n]
 
-    # while a viewer is running texture.entries can list a texture whose head
-    # has not reached texture.cache yet
+    # seeking past the end of a BytesIO is legal and reads back short rather
+    # than raising, so the length is what has to be checked. texture.cache
+    # lagging behind texture.entries is normal while a viewer is running
+    texture_cache.seek(offset)
+    head = texture_cache.read(TEXTURE_CACHE_BYTE_COUNT)
+
     if len(head) != TEXTURE_CACHE_BYTE_COUNT:
         raise TextureCacheError(
             f"failed to read from texture cache at {offset}, got {len(head)} of {TEXTURE_CACHE_BYTE_COUNT} bytes"

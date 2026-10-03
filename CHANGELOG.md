@@ -3,8 +3,7 @@
 ## unreleased
 
 - cli: change extraction text
-- partially load cache entries as needed instead of reading entire file into
-  memory
+- read texture.cache on first use instead of on every refresh
 
 ## v0.1.0 - 2026-09-23
 
