@@ -19,6 +19,7 @@ dev = [
   "pytest>=8",
   "hypothesis>=6",
   "types-setuptools",
+  "pytest-benchmark>=5.3.0",
 ]
 
 [tool.setuptools.package-data]

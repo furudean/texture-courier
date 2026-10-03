@@ -102,6 +102,22 @@ refer to the [api.py](src/texture_courier/api.py) file for additional methods an
 i use `pip install --editable .` to install texture-courier as an editable
 package, which allows the cli to be used like it was installed from pip.
 
+`tests/` contains unit tests and they may be executed like this:
+
+```bash
+uv run pytest
+```
+
+`benchmarks/` contains profiling tests and are invoked like so:
+
+```bash
+CACHE_DIR=/Users/meri/Library/Caches/Firestorm_x64/texturecache uv run pytest benchmarks
+```
+
+`CACHE_DIR` should be a path to a texture cache, ideally one that is full to
+represent a real benchmark. this repo contains no fixture for this as the data
+would be too large to store on git.
+
 [lltexturecache.h](https://github.com/secondlife/viewer/blob/develop/indra/newview/lltexturecache.h)
 is the authoritative implementation of the texture cache, which much of this implementation was
 engineered out of.
