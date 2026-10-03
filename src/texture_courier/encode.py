@@ -139,6 +139,6 @@ def encode_png(width: int, height: int, components: int, pixels: bytes) -> bytes
             b"IHDR",
             struct.pack(">IIBBBBB", width, height, 8, PNG_COLOR_TYPES[components], 0, 0, 0),
         )
-        + png_chunk(b"IDAT", zlib.compress(b"".join(scanlines), 9))
+        + png_chunk(b"IDAT", zlib.compress(b"".join(scanlines), 0))
         + png_chunk(b"IEND", b"")
     )

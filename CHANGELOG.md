@@ -4,6 +4,7 @@
 
 - cli: change extraction text
 - read texture.cache on first use instead of on every refresh
+- thumbnail pngs come out uncompressed for speed
 
 ## v0.1.0 - 2026-09-23
 
