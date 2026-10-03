@@ -93,7 +93,9 @@ with open(f"{tex.uuid}.png", "wb") as f:
     f.write(thumb.png())
 ```
 
-`thumb.pixels` holds the raw rows if you would rather encode them yourself.
+`thumb.pixels` holds the raw rows if you would rather encode them yourself. the
+rows run bottom up, unlike most image formats which treat row 0 as the top of
+the image so you may need to reverse it before using.
 
 refer to the [api.py](src/texture_courier/api.py) file for additional methods and helpers.
 
