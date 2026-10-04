@@ -2,11 +2,16 @@
 
 ## unreleased
 
+### changed
+
 - cli: change extraction text
 - read texture.cache on first use instead of on every refresh
 - thumbnail pngs come out uncompressed for speed, and encode about 10% faster
 - opening a cache is ~3x faster
 - `Texture.jpeg_2000()` is about 20% faster
+
+### fixed
+
 - fix multi-threaded reads (including the cli) sometimes returning another
   texture's head or thumbnail, which could write corrupt jp2s or wrong
   thumbnails
