@@ -20,7 +20,7 @@ from .core import (
 from .encode import (
     EOC_MARKER,
     SOC_MARKER,
-    wrap_jp2,
+    jp2_prefix,
 )
 from .error import TextureCacheError
 from .util import format_bytes
@@ -69,20 +69,21 @@ class Texture(Entry):
     def __incomplete(self) -> TextureCacheError:
         return TextureCacheError(f"{self.uuid} holds {self.cached_size} of {self.image_size} bytes")
 
-    def __verify(self, head: bytes, body_size: int, codestream: bytes) -> None:
+    def __verify(self, head: bytes, body: bytes) -> None:
         if not self.is_complete:
             raise self.__incomplete()
 
         if len(head) != self.head_size:
             raise TextureCacheError(f"{self.uuid} has a {len(head)} byte head, entry describes {self.head_size}")
 
-        if body_size != self.body_size:
-            raise TextureCacheError(f"{self.uuid} has a {body_size} byte body, entry describes {self.body_size}")
+        if len(body) != self.body_size:
+            raise TextureCacheError(f"{self.uuid} has a {len(body)} byte body, entry describes {self.body_size}")
 
-        if not codestream.startswith(SOC_MARKER):
+        if not head.startswith(SOC_MARKER):
             raise TextureCacheError(f"{self.uuid} does not open on a jpeg 2000 codestream")
 
-        if not codestream.endswith(EOC_MARKER):
+        # the marker can straddle the head and a one byte body
+        if not (head + body[-2:]).endswith(EOC_MARKER):
             raise TextureCacheError(f"{self.uuid} is missing the marker that ends a codestream")
 
     def fs_size(self) -> int:
@@ -94,6 +95,21 @@ class Texture(Entry):
 
         return self.head_size + body_size
 
+    def __read_codestream(self, *, verify: bool) -> tuple[bytes, bytes]:
+        # sanity check before doing expensive reads
+        if verify and not self.is_complete:
+            raise self.__incomplete()
+
+        head = self.__read_head()
+        body = b"" if self.body_size == 0 else read_texture_body(self.body_path)
+
+        if verify:
+            # against the bytes in hand rather than the file, a viewer writing
+            # to the cache can move the body between a check and the read after
+            self.__verify(head, body)
+
+        return head, body
+
     def codestream(self, *, verify: bool = True) -> bytes:
         """
         Open the bare JPEG 2000 codestream as a bytes object.
@@ -101,20 +117,9 @@ class Texture(Entry):
         This is not intended to be used as a transfer or storage format.
         """
 
-        # sanity check before doing expensive reads
-        if verify and not self.is_complete:
-            raise self.__incomplete()
+        head, body = self.__read_codestream(verify=verify)
 
-        head = self.__read_head()
-        body = b"" if self.body_size == 0 else read_texture_body(self.body_path)
-        codestream = head + body
-
-        if verify:
-            # against the bytes in hand rather than the file, a viewer writing
-            # to the cache can move the body between a check and the read after
-            self.__verify(head, len(body), codestream)
-
-        return codestream
+        return head + body
 
     def jpeg_2000(self, *, verify: bool = True) -> bytes:
         """
@@ -124,7 +129,9 @@ class Texture(Entry):
         but will have much better compatibility with other software.
         """
 
-        return wrap_jp2(self.codestream(verify=verify))
+        head, body = self.__read_codestream(verify=verify)
+
+        return b"".join((jp2_prefix(head, len(head) + len(body)), head, body))
 
     @cached_property
     def thumbnail(self) -> Thumbnail | None:

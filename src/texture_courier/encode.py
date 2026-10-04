@@ -54,7 +54,12 @@ def jp2_box(kind: bytes, payload: bytes) -> bytes:
 
 def wrap_jp2(codestream: bytes) -> bytes:
     """Put a JPEG 2000 codestream in a container without reencoding it"""
-    width, height, components, bit_depth = codestream_size(codestream)
+    return b"".join((jp2_prefix(codestream, len(codestream)), codestream))
+
+
+def jp2_prefix(codestream_head: bytes, codestream_byte_count: int) -> bytes:
+    """The jp2 bytes that come before the codestream. reads only up to the end of the SIZ marker"""
+    width, height, components, bit_depth = codestream_size(codestream_head)
 
     if not 0 < components <= MAX_COMPONENTS:
         raise TextureCacheError(f"cannot describe {components} components in a jp2")
@@ -105,7 +110,8 @@ def wrap_jp2(codestream: bytes) -> bytes:
         JP2_SIGNATURE
         + jp2_box(b"ftyp", JP2_BRAND + struct.pack(">I", 0) + JP2_BRAND)
         + jp2_box(b"jp2h", header)
-        + jp2_box(b"jp2c", codestream)
+        + struct.pack(">I", 8 + codestream_byte_count)
+        + b"jp2c"
     )
 
 
