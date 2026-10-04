@@ -17,6 +17,7 @@
   thumbnails
 - for correctness, `Texture.thumbnail` is `None` when `FastCache.cache` is
   empty. used to be unhandled exception.
+- consistency fixes for reading a cache while the viewer is writing to it
 
 ## v0.1.0 - 2026-09-23
 

@@ -101,7 +101,7 @@ class Texture(Entry):
             raise self.__incomplete()
 
         # the slot is a fixed width, so trim the zero padding that follows
-        head = self.__cache._read_head(self.index)[: self.head_size]
+        head = self.__cache._read_head(self)[: self.head_size]
         body = b"" if self.body_size == 0 else read_texture_body(self.body_path)
 
         if verify:
@@ -138,7 +138,7 @@ class Texture(Entry):
     def thumbnail(self) -> Thumbnail | None:
         """The thumbnail the cache keeps beside the texture, if it has one yet"""
 
-        return self.__cache._read_thumbnail(self.index)
+        return self.__cache._read_thumbnail(self)
 
     def dimensions(self) -> tuple[int, int] | None:
         """The dimensions the cache claims for the texture as (width, height)
@@ -159,8 +159,8 @@ class TextureCache:
     textures: dict[str, Texture]
 
     __entries_raw: bytes
-    __texture_cache_raw: bytes | None
-    __fast_cache_raw: bytes | None
+    __texture_cache_raw: tuple[bytes, bytes] | None
+    __fast_cache_raw: tuple[bytes, bytes] | None
     __load_lock: Lock
     __order: list[Texture] | None
 
@@ -225,41 +225,58 @@ class TextureCache:
     def has_fastcache(self) -> bool:
         return (self.cache_dir / "FastCache.cache").is_file()
 
-    def __fast_cache(self) -> bytes:
-        raw = self.__fast_cache_raw
+    def __snapshot(self, raw: bytes) -> tuple[bytes, bytes]:
+        # texture.entries is read after the file it describes, so a row the
+        # viewer reuses between the two reads fails the row check
+        return raw, (self.cache_dir / "texture.entries").read_bytes()
 
-        if raw is None:
+    def __fast_cache(self) -> tuple[bytes, bytes]:
+        loaded = self.__fast_cache_raw
+
+        if loaded is None:
             with self.__load_lock:
-                raw = self.__fast_cache_raw
+                loaded = self.__fast_cache_raw
 
-                if raw is None:
+                if loaded is None:
                     path = self.cache_dir / "FastCache.cache"
-                    raw = self.__fast_cache_raw = path.read_bytes() if path.is_file() else b""
+                    loaded = self.__fast_cache_raw = self.__snapshot(path.read_bytes() if path.is_file() else b"")
 
-        return raw
+        return loaded
 
-    def __texture_cache(self) -> bytes:
-        raw = self.__texture_cache_raw
+    def __texture_cache(self) -> tuple[bytes, bytes]:
+        loaded = self.__texture_cache_raw
 
-        if raw is None:
+        if loaded is None:
             with self.__load_lock:
-                raw = self.__texture_cache_raw
+                loaded = self.__texture_cache_raw
 
-                if raw is None:
-                    raw = self.__texture_cache_raw = (self.cache_dir / "texture.cache").read_bytes()
+                if loaded is None:
+                    raw = (self.cache_dir / "texture.cache").read_bytes()
+                    loaded = self.__texture_cache_raw = self.__snapshot(raw)
 
-        return raw
+        return loaded
 
-    def _read_head(self, i: int) -> bytes:
-        return read_texture_cache(self.__texture_cache(), i)
+    @staticmethod
+    def __check_row(texture: Texture, entries_raw: bytes) -> None:
+        offset = HEADER_BYTE_COUNT + texture.index * ENTRY_BYTE_COUNT
+        slot = entries_raw[offset : offset + ENTRY_BYTE_COUNT]
 
-    def _read_thumbnail(self, i: int) -> Thumbnail | None:
-        fast_cache = self.__fast_cache()
+        if len(slot) != ENTRY_BYTE_COUNT or Entry.from_bytes(slot) != texture:
+            raise TextureCacheError(f"{texture.uuid} has left row {texture.index} since it was read")
 
-        if not fast_cache:
-            return None
+    # rows are checked against the entries read alongside the file, since
+    # self.entries can predate it
+    def _read_head(self, texture: Texture) -> bytes:
+        texture_cache, entries_raw = self.__texture_cache()
+        self.__check_row(texture, entries_raw)
 
-        return read_fast_cache(fast_cache, i)
+        return read_texture_cache(texture_cache, texture.index)
+
+    def _read_thumbnail(self, texture: Texture) -> Thumbnail | None:
+        fast_cache, entries_raw = self.__fast_cache()
+        self.__check_row(texture, entries_raw)
+
+        return read_fast_cache(fast_cache, texture.index) if fast_cache else None
 
     def __texture(self, i: int, entry: Entry) -> Texture:
         return Texture(index=i, entry=entry, cache=self)
@@ -320,8 +337,10 @@ class TextureCache:
                     continue
 
                 live.add(entry.uuid)
+                existing = self.textures.get(entry.uuid)
 
-                if entry not in self:
+                # an entry equal by its fields can still have changed rows
+                if existing is None or existing.index != i or existing != entry:
                     changed_textures[entry.uuid] = self.__texture(i, entry)
 
             evicted = self.textures.keys() - live
@@ -344,12 +363,6 @@ class TextureCache:
                 if not entry.is_empty:
                     changed_textures[entry.uuid] = self.__texture(i, entry)
 
-        self.__entries_raw = entries_raw
-        self.__texture_cache_raw = None
-        self.__fast_cache_raw = None
-        self.header = header
-        self.entries = entries
-
         evicted -= changed_textures.keys()
         textures = (
             {uuid: texture for uuid, texture in self.textures.items() if uuid not in evicted}
@@ -358,8 +371,15 @@ class TextureCache:
         )
         textures |= changed_textures
 
-        self.textures = textures
-        self.__order = None
+        # a load in flight would otherwise store bytes from before the refresh
+        with self.__load_lock:
+            self.__entries_raw = entries_raw
+            self.__texture_cache_raw = None
+            self.__fast_cache_raw = None
+            self.header = header
+            self.entries = entries
+            self.textures = textures
+            self.__order = None
 
         return iter(changed_textures.values())
 
