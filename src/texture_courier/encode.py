@@ -132,12 +132,11 @@ def encode_png(width: int, height: int, components: int, pixels: bytes) -> bytes
         )
 
     stride = width * components
-    scanlines = []
+    rows = [pixels[start : start + stride] for start in range(0, expected, stride)]
+    rows.reverse()
 
-    # png rows run top down and each is prefixed with its filter type
-    for row in reversed(range(height)):
-        start = row * stride
-        scanlines.append(b"\x00" + pixels[start : start + stride])
+    # png rows run top down and each opens on its filter type, 0 for none
+    scanlines = b"\x00" + b"\x00".join(rows)
 
     return (
         PNG_SIGNATURE
@@ -145,6 +144,6 @@ def encode_png(width: int, height: int, components: int, pixels: bytes) -> bytes
             b"IHDR",
             struct.pack(">IIBBBBB", width, height, 8, PNG_COLOR_TYPES[components], 0, 0, 0),
         )
-        + png_chunk(b"IDAT", zlib.compress(b"".join(scanlines), 0))
+        + png_chunk(b"IDAT", zlib.compress(scanlines, 0))
         + png_chunk(b"IEND", b"")
     )

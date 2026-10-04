@@ -1,4 +1,4 @@
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from functools import cached_property
 from io import BytesIO
 from pathlib import Path
@@ -39,16 +39,13 @@ class Texture(Entry):
         *,
         index: int,
         entry: Entry,
-        cache_dir: Path,
-        read_head: Callable[[], bytes],
-        read_thumbnail: Callable[[], Thumbnail | None],
+        cache: "TextureCache",
     ):
         self.__dict__.update(entry.__dict__)
 
         self.index = index
-        self.cache_dir = cache_dir
-        self.__read_head = read_head
-        self.__read_thumbnail = read_thumbnail
+        self.cache_dir = cache.cache_dir
+        self.__cache = cache
 
     @cached_property
     def body_path(self) -> Path:
@@ -103,7 +100,8 @@ class Texture(Entry):
         if verify and not self.is_complete:
             raise self.__incomplete()
 
-        head = self.__read_head()
+        # the slot is a fixed width, so trim the zero padding that follows
+        head = self.__cache._read_head(self.index)[: self.head_size]
         body = b"" if self.body_size == 0 else read_texture_body(self.body_path)
 
         if verify:
@@ -140,7 +138,7 @@ class Texture(Entry):
     def thumbnail(self) -> Thumbnail | None:
         """The thumbnail the cache keeps beside the texture, if it has one yet"""
 
-        return self.__read_thumbnail()
+        return self.__cache._read_thumbnail(self.index)
 
     def dimensions(self) -> tuple[int, int] | None:
         """The dimensions the cache claims for the texture as (width, height)
@@ -252,32 +250,19 @@ class TextureCache:
 
         return raw
 
-    def __get_read_head(self, i: int, entry: Entry) -> Callable[[], bytes]:
-        def read_head() -> bytes:
-            # the slot is a fixed width, so trim the zero padding that follows
-            return read_texture_cache(self.__texture_cache(), i)[: entry.head_size]
+    def _read_head(self, i: int) -> bytes:
+        return read_texture_cache(self.__texture_cache(), i)
 
-        return read_head
+    def _read_thumbnail(self, i: int) -> Thumbnail | None:
+        fast_cache = self.__fast_cache()
 
-    def __get_read_thumbnail(self, i: int) -> Callable[[], Thumbnail | None]:
-        def read_thumbnail() -> Thumbnail | None:
-            fast_cache = self.__fast_cache()
+        if not fast_cache:
+            return None
 
-            if not fast_cache:
-                return None
-
-            return read_fast_cache(fast_cache, i)
-
-        return read_thumbnail
+        return read_fast_cache(fast_cache, i)
 
     def __texture(self, i: int, entry: Entry) -> Texture:
-        return Texture(
-            index=i,
-            entry=entry,
-            read_head=self.__get_read_head(i, entry),
-            read_thumbnail=self.__get_read_thumbnail(i),
-            cache_dir=self.cache_dir,
-        )
+        return Texture(index=i, entry=entry, cache=self)
 
     def __changed_slots(self, entries_raw: bytes) -> list[int] | None:
         previous = self.__entries_raw
