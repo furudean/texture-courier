@@ -91,7 +91,10 @@ class Texture(Entry):
         if self.is_empty:
             return 0
 
-        body_size = self.body_path.stat().st_size if self.body_path.is_file() else 0
+        try:
+            body_size = self.body_path.stat().st_size
+        except FileNotFoundError:
+            body_size = 0
 
         return self.head_size + body_size
 
@@ -158,7 +161,6 @@ class TextureCache:
     textures: dict[str, Texture]
 
     __entries_raw: bytes
-    __texture_entries_file: BytesIO
     __texture_cache_raw: bytes | None
     __fast_cache_raw: bytes | None
     __load_lock: Lock
@@ -358,7 +360,6 @@ class TextureCache:
                     changed_textures[entry.uuid] = self.__texture(i, entry)
 
         self.__entries_raw = entries_raw
-        self.__texture_entries_file = texture_entries_file
         self.__texture_cache_raw = None
         self.__fast_cache_raw = None
         self.header = header

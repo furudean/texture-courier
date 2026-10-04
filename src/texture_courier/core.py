@@ -288,8 +288,8 @@ def texture_location(cache_dir: Path, uuid: str) -> Path:
 
 
 def read_texture_body(path: Path) -> bytes:
-    if not path.is_file():
-        raise FileNotFoundError(f"no texture body at {path}")
-
-    with open(path, "rb") as body_file:
-        return body_file.read()
+    try:
+        with open(path, "rb") as body_file:
+            return body_file.read()
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"no texture body at {path}") from e
