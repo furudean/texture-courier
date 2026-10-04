@@ -2,6 +2,7 @@ from collections.abc import Callable, Iterator
 from functools import cached_property
 from io import BytesIO
 from pathlib import Path
+from threading import Lock
 from typing import TypeVar, overload
 
 from .core import (
@@ -27,10 +28,6 @@ from .util import format_bytes
 T = TypeVar("T")
 
 DIFF_BLOCK_BYTE_COUNT = 4096
-
-
-def loads_bytes_io(p: Path) -> BytesIO:
-    return BytesIO(p.read_bytes())
 
 
 class Texture(Entry):
@@ -151,8 +148,9 @@ class TextureCache:
 
     __entries_raw: bytes
     __texture_entries_file: BytesIO
-    __texture_cache_file: BytesIO | None
-    __fast_cache_file: BytesIO | None
+    __texture_cache_raw: bytes | None
+    __fast_cache_raw: bytes | None
+    __load_lock: Lock
     __order: list[Texture] | None
 
     def __init__(self, cache_dir: str | Path):
@@ -160,8 +158,9 @@ class TextureCache:
         self.entries = []
         self.textures = {}
         self.__entries_raw = b""
-        self.__texture_cache_file = None
-        self.__fast_cache_file = None
+        self.__texture_cache_raw = None
+        self.__fast_cache_raw = None
+        self.__load_lock = Lock()
         self.__order = None
 
         if (
@@ -215,18 +214,30 @@ class TextureCache:
     def has_fastcache(self) -> bool:
         return (self.cache_dir / "FastCache.cache").is_file()
 
-    def __fast_cache(self) -> BytesIO | None:
-        if self.__fast_cache_file is None:
-            path = self.cache_dir / "FastCache.cache"
-            self.__fast_cache_file = loads_bytes_io(path) if path.is_file() else None
+    def __fast_cache(self) -> bytes:
+        raw = self.__fast_cache_raw
 
-        return self.__fast_cache_file
+        if raw is None:
+            with self.__load_lock:
+                raw = self.__fast_cache_raw
 
-    def __texture_cache(self) -> BytesIO:
-        if self.__texture_cache_file is None:
-            self.__texture_cache_file = loads_bytes_io(self.cache_dir / "texture.cache")
+                if raw is None:
+                    path = self.cache_dir / "FastCache.cache"
+                    raw = self.__fast_cache_raw = path.read_bytes() if path.is_file() else b""
 
-        return self.__texture_cache_file
+        return raw
+
+    def __texture_cache(self) -> bytes:
+        raw = self.__texture_cache_raw
+
+        if raw is None:
+            with self.__load_lock:
+                raw = self.__texture_cache_raw
+
+                if raw is None:
+                    raw = self.__texture_cache_raw = (self.cache_dir / "texture.cache").read_bytes()
+
+        return raw
 
     def __get_read_head(self, i: int, entry: Entry) -> Callable[[], bytes]:
         def read_head() -> bytes:
@@ -239,7 +250,7 @@ class TextureCache:
         def read_thumbnail() -> Thumbnail | None:
             fast_cache = self.__fast_cache()
 
-            if fast_cache is None:
+            if not fast_cache:
                 return None
 
             return read_fast_cache(fast_cache, i)
@@ -337,8 +348,8 @@ class TextureCache:
 
         self.__entries_raw = entries_raw
         self.__texture_entries_file = texture_entries_file
-        self.__texture_cache_file = None
-        self.__fast_cache_file = None
+        self.__texture_cache_raw = None
+        self.__fast_cache_raw = None
         self.header = header
         self.entries = entries
 

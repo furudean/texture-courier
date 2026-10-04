@@ -226,11 +226,9 @@ class Thumbnail:
         )
 
 
-def read_fast_cache(fast_cache: BytesIO, n: int) -> Thumbnail | None:
+def read_fast_cache(fast_cache: bytes, n: int) -> Thumbnail | None:
     offset = FAST_CACHE_BYTE_COUNT * n
-
-    fast_cache.seek(offset)
-    raw = fast_cache.read(FAST_CACHE_BYTE_COUNT)
+    raw = fast_cache[offset : offset + FAST_CACHE_BYTE_COUNT]
 
     if len(raw) != FAST_CACHE_BYTE_COUNT:
         raise TextureCacheError(
@@ -260,14 +258,13 @@ def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[E
     ]
 
 
-def read_texture_cache(texture_cache: BytesIO, n: int) -> bytes:
+def read_texture_cache(texture_cache: bytes, n: int) -> bytes:
     offset = TEXTURE_CACHE_BYTE_COUNT * n
 
-    # seeking past the end of a BytesIO is legal and reads back short rather
-    # than raising, so the length is what has to be checked. texture.cache
-    # lagging behind texture.entries is normal while a viewer is running
-    texture_cache.seek(offset)
-    head = texture_cache.read(TEXTURE_CACHE_BYTE_COUNT)
+    # a slice past the end comes back short rather than raising, so the length
+    # is what has to be checked. texture.cache lagging behind texture.entries
+    # is normal while a viewer is running
+    head = texture_cache[offset : offset + TEXTURE_CACHE_BYTE_COUNT]
 
     if len(head) != TEXTURE_CACHE_BYTE_COUNT:
         raise TextureCacheError(

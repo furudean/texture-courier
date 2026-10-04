@@ -5,6 +5,11 @@
 - cli: change extraction text
 - read texture.cache on first use instead of on every refresh
 - thumbnail pngs come out uncompressed for speed
+- fix multi-threaded reads (including the cli) sometimes returning another
+  texture's head or thumbnail, which could write corrupt jp2s or wrong
+  thumbnails
+- for correctness, `Texture.thumbnail` is `None` when `FastCache.cache` is
+  empty. used to be unhandled exception.
 
 ## v0.1.0 - 2026-09-23
 
