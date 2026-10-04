@@ -5,6 +5,7 @@
 - cli: change extraction text
 - read texture.cache on first use instead of on every refresh
 - thumbnail pngs come out uncompressed for speed
+- opening a cache is about twice as fast
 - fix multi-threaded reads (including the cli) sometimes returning another
   texture's head or thumbnail, which could write corrupt jp2s or wrong
   thumbnails

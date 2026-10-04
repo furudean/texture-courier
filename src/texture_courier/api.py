@@ -32,23 +32,27 @@ DIFF_BLOCK_BYTE_COUNT = 4096
 
 class Texture(Entry):
     index: int
-    body_path: Path
+    cache_dir: Path
 
     def __init__(
         self,
         *,
         index: int,
         entry: Entry,
-        body_path: Path,
+        cache_dir: Path,
         read_head: Callable[[], bytes],
         read_thumbnail: Callable[[], Thumbnail | None],
     ):
-        super().__init__(**entry.__dict__)
+        self.__dict__.update(entry.__dict__)
 
         self.index = index
-        self.body_path = body_path
+        self.cache_dir = cache_dir
         self.__read_head = read_head
         self.__read_thumbnail = read_thumbnail
+
+    @cached_property
+    def body_path(self) -> Path:
+        return texture_location(self.cache_dir, self.uuid)
 
     def __repr__(self) -> str:
         size = format_bytes(self.image_size) if not self.is_empty else "empty"
@@ -263,7 +267,7 @@ class TextureCache:
             entry=entry,
             read_head=self.__get_read_head(i, entry),
             read_thumbnail=self.__get_read_thumbnail(i),
-            body_path=texture_location(self.cache_dir, entry.uuid),
+            cache_dir=self.cache_dir,
         )
 
     def __changed_slots(self, entries_raw: bytes) -> list[int] | None:

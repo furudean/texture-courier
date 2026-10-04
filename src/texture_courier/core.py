@@ -1,7 +1,7 @@
 import struct
 from collections.abc import Iterator
 from datetime import datetime
-from functools import total_ordering
+from functools import cached_property, total_ordering
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Self
@@ -92,16 +92,37 @@ class Header:
 
 @total_ordering
 class Entry:
-    uuid: str
     image_size: int
     body_size: int
-    time: datetime
+
+    __raw_uuid: bytes
+    __timestamp: int
 
     def __init__(self, uuid: str, image_size: int, body_size: int, time: datetime):
         self.uuid = uuid
         self.image_size = image_size
         self.body_size = body_size
         self.time = time
+
+    # most slots in a cache are empty, so uuid and time wait until something
+    # reads them
+    @classmethod
+    def from_fields(cls, raw_uuid: bytes, image_size: int, body_size: int, timestamp: int) -> Self:
+        entry = cls.__new__(cls)
+        entry.__raw_uuid = raw_uuid
+        entry.image_size = image_size
+        entry.body_size = body_size
+        entry.__timestamp = timestamp
+
+        return entry
+
+    @cached_property
+    def uuid(self) -> str:
+        return format_uuid(self.__raw_uuid)
+
+    @cached_property
+    def time(self) -> datetime:
+        return datetime.fromtimestamp(self.__timestamp)  # noqa: DTZ006
 
     def __repr__(self) -> str:
         size = format_bytes(self.image_size) if not self.is_empty else "empty"
@@ -146,14 +167,7 @@ class Entry:
 
     @classmethod
     def from_bytes(cls, b: bytes) -> Self:
-        uuid, image_size, body_size, time = struct.unpack(ENTRY_STRUCT_FORMAT, b)
-
-        return cls(
-            uuid=format_uuid(uuid),
-            image_size=image_size,
-            body_size=body_size,
-            time=datetime.fromtimestamp(time),  # noqa: DTZ006
-        )
+        return cls.from_fields(*struct.unpack(ENTRY_STRUCT_FORMAT, b))
 
 
 class Thumbnail:
@@ -247,15 +261,7 @@ def decode_texture_entries(texture_entries: BytesIO, entry_count: int) -> list[E
     if len(raw) != expected:
         raise TextureCacheError(f"read {len(raw)} bytes of entries, expected {expected} for {entry_count} entries")
 
-    return [
-        Entry(
-            uuid=format_uuid(uuid),
-            image_size=image_size,
-            body_size=body_size,
-            time=datetime.fromtimestamp(time),  # noqa: DTZ006
-        )
-        for uuid, image_size, body_size, time in struct.iter_unpack(ENTRY_STRUCT_FORMAT, raw)
-    ]
+    return [Entry.from_fields(*fields) for fields in struct.iter_unpack(ENTRY_STRUCT_FORMAT, raw)]
 
 
 def read_texture_cache(texture_cache: bytes, n: int) -> bytes:
