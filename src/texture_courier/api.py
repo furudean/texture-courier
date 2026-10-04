@@ -21,6 +21,7 @@ from .encode import (
     EOC_MARKER,
     SOC_MARKER,
     jp2_prefix,
+    tile_parts_end,
 )
 from .error import TextureCacheError
 from .util import format_bytes
@@ -28,6 +29,9 @@ from .util import format_bytes
 T = TypeVar("T")
 
 DIFF_BLOCK_BYTE_COUNT = 4096
+
+# file bytes and the texture.entries read after them
+Snapshot = tuple[bytes, bytes]
 
 
 class Texture(Entry):
@@ -82,6 +86,13 @@ class Texture(Entry):
         # the marker can straddle the head and a one byte body
         if not (head + body[-2:]).endswith(EOC_MARKER):
             raise TextureCacheError(f"{self.uuid} is missing the marker that ends a codestream")
+
+        # the viewer writes a row before its head, so a head read in between
+        # belongs to the row's previous occupant and its lengths will not fit
+        end = tile_parts_end(head, body)
+
+        if end is not None and end != len(head) + len(body) - len(EOC_MARKER):
+            raise TextureCacheError(f"{self.uuid} has a head whose tile-part lengths do not fit the texture")
 
     def fs_size(self) -> int:
         """Get the size of the texture file on disk in bytes"""
@@ -159,8 +170,7 @@ class TextureCache:
     textures: dict[str, Texture]
 
     __entries_raw: bytes
-    __texture_cache_raw: tuple[bytes, bytes] | None
-    __fast_cache_raw: tuple[bytes, bytes] | None
+    __snapshots: dict[str, Snapshot]
     __load_lock: Lock
     __order: list[Texture] | None
 
@@ -169,8 +179,7 @@ class TextureCache:
         self.entries = []
         self.textures = {}
         self.__entries_raw = b""
-        self.__texture_cache_raw = None
-        self.__fast_cache_raw = None
+        self.__snapshots = {}
         self.__load_lock = Lock()
         self.__order = None
 
@@ -225,34 +234,21 @@ class TextureCache:
     def has_fastcache(self) -> bool:
         return (self.cache_dir / "FastCache.cache").is_file()
 
-    def __snapshot(self, raw: bytes) -> tuple[bytes, bytes]:
-        # texture.entries is read after the file it describes, so a row the
-        # viewer reuses between the two reads fails the row check
-        return raw, (self.cache_dir / "texture.entries").read_bytes()
-
-    def __fast_cache(self) -> tuple[bytes, bytes]:
-        loaded = self.__fast_cache_raw
+    def __snapshot(self, name: str) -> Snapshot:
+        loaded = self.__snapshots.get(name)
 
         if loaded is None:
             with self.__load_lock:
-                loaded = self.__fast_cache_raw
+                loaded = self.__snapshots.get(name)
 
                 if loaded is None:
-                    path = self.cache_dir / "FastCache.cache"
-                    loaded = self.__fast_cache_raw = self.__snapshot(path.read_bytes() if path.is_file() else b"")
+                    path = self.cache_dir / name
+                    raw = path.read_bytes() if path.is_file() else b""
 
-        return loaded
-
-    def __texture_cache(self) -> tuple[bytes, bytes]:
-        loaded = self.__texture_cache_raw
-
-        if loaded is None:
-            with self.__load_lock:
-                loaded = self.__texture_cache_raw
-
-                if loaded is None:
-                    raw = (self.cache_dir / "texture.cache").read_bytes()
-                    loaded = self.__texture_cache_raw = self.__snapshot(raw)
+                    # texture.entries is read after the file it describes, so a
+                    # row the viewer reuses between the two reads fails the row check
+                    entries_raw = (self.cache_dir / "texture.entries").read_bytes()
+                    loaded = self.__snapshots[name] = (raw, entries_raw)
 
         return loaded
 
@@ -266,33 +262,36 @@ class TextureCache:
 
     # rows are checked against the entries read alongside the file, since
     # self.entries can predate it
-    def _read_head(self, texture: Texture) -> bytes:
-        texture_cache, entries_raw = self.__texture_cache()
+    def __read_slots(self, name: str, texture: Texture) -> bytes:
+        raw, entries_raw = self.__snapshot(name)
         self.__check_row(texture, entries_raw)
 
-        return read_texture_cache(texture_cache, texture.index)
+        return raw
+
+    def _read_head(self, texture: Texture) -> bytes:
+        return read_texture_cache(self.__read_slots("texture.cache", texture), texture.index)
 
     def _read_thumbnail(self, texture: Texture) -> Thumbnail | None:
-        fast_cache, entries_raw = self.__fast_cache()
-        self.__check_row(texture, entries_raw)
+        fast_cache = self.__read_slots("FastCache.cache", texture)
 
         return read_fast_cache(fast_cache, texture.index) if fast_cache else None
 
     def __texture(self, i: int, entry: Entry) -> Texture:
         return Texture(index=i, entry=entry, cache=self)
 
-    def __changed_slots(self, entries_raw: bytes) -> list[int] | None:
+    def __changed_slots(self, entries_raw: bytes, entry_count: int) -> list[int] | None:
         previous = self.__entries_raw
 
-        # a header only passes validation against a length, so a length that
-        # differs is an entry count that differs, and every slot has moved
-        if len(previous) != len(entries_raw):
+        # the file can run past the rows the header counts, so only the header
+        # tells whether the count has changed
+        if previous[:HEADER_BYTE_COUNT] != entries_raw[:HEADER_BYTE_COUNT]:
             return None
 
         slots: list[int] = []
+        rows_end = HEADER_BYTE_COUNT + entry_count * ENTRY_BYTE_COUNT
 
-        for start in range(HEADER_BYTE_COUNT, len(entries_raw), DIFF_BLOCK_BYTE_COUNT):
-            stop = min(start + DIFF_BLOCK_BYTE_COUNT, len(entries_raw))
+        for start in range(HEADER_BYTE_COUNT, rows_end, DIFF_BLOCK_BYTE_COUNT):
+            stop = min(start + DIFF_BLOCK_BYTE_COUNT, rows_end)
 
             if previous[start:stop] == entries_raw[start:stop]:
                 continue
@@ -320,7 +319,7 @@ class TextureCache:
 
         texture_entries_file = BytesIO(entries_raw)
         header = Header.from_texture_entries(texture_entries_file)
-        slots = self.__changed_slots(entries_raw)
+        slots = self.__changed_slots(entries_raw, header.entry_count)
 
         changed_textures: dict[str, Texture] = {}
         evicted: set[str] = set()
@@ -374,8 +373,7 @@ class TextureCache:
         # a load in flight would otherwise store bytes from before the refresh
         with self.__load_lock:
             self.__entries_raw = entries_raw
-            self.__texture_cache_raw = None
-            self.__fast_cache_raw = None
+            self.__snapshots = {}
             self.header = header
             self.entries = entries
             self.textures = textures

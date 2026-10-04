@@ -9,6 +9,7 @@ from .error import TextureCacheError
 SOC_MARKER = b"\xff\x4f"
 SIZ_MARKER = b"\xff\x51"
 EOC_MARKER = b"\xff\xd9"
+SOT_MARKER = b"\xff\x90"
 SIZ_BYTE_COUNT = 43
 
 JP2_SIGNATURE = b"\x00\x00\x00\x0cjP  \r\n\x87\n"
@@ -46,6 +47,41 @@ def codestream_size(codestream: bytes) -> tuple[int, int, int, int]:
     bit_depth = (codestream[42] & 0x7F) + 1
 
     return xsiz - xosiz, ysiz - yosiz, components, bit_depth
+
+
+def span(head: bytes, body: bytes, start: int, stop: int) -> bytes:
+    """Bytes of the codestream split across head and body, without joining the two"""
+    if stop <= len(head):
+        return head[start:stop]
+
+    if start >= len(head):
+        return body[start - len(head) : stop - len(head)]
+
+    return head[start:] + body[: stop - len(head)]
+
+
+def tile_parts_end(head: bytes, body: bytes) -> int | None:
+    """Where the tile-part lengths place the EOC marker
+
+    None when the last tile-part leaves its length to the EOC marker.
+    """
+    pos = len(SOC_MARKER)
+
+    while (segment := span(head, body, pos, pos + 4))[:2] != SOT_MARKER:
+        if len(segment) != 4 or segment[0] != 0xFF:
+            raise TextureCacheError("codestream main header does not lead to a tile-part")
+
+        pos += 2 + struct.unpack(">H", segment[2:])[0]
+
+    while len(sot := span(head, body, pos, pos + 10)) == 10 and sot[:2] == SOT_MARKER:
+        psot = struct.unpack(">I", sot[6:])[0]
+
+        if psot == 0:
+            return None
+
+        pos += psot
+
+    return pos
 
 
 def jp2_box(kind: bytes, payload: bytes) -> bytes:

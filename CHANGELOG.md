@@ -18,6 +18,10 @@
 - for correctness, `Texture.thumbnail` is `None` when `FastCache.cache` is
   empty. used to be unhandled exception.
 - consistency fixes for reading a cache while the viewer is writing to it
+- verification rejects a head whose tile-part lengths do not fit the texture,
+  which catches a head the viewer has not yet written over
+- `TextureCache.refresh()` picks up a changed entry count when the file length
+  stays the same, and no longer raises `IndexError` on rows past the count
 
 ## v0.1.0 - 2026-09-23
 
