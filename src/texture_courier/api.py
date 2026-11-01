@@ -56,7 +56,7 @@ class Texture(Entry):
         return texture_location(self.cache_dir, self.uuid)
 
     def __repr__(self) -> str:
-        size = format_bytes(self.image_size) if not self.is_empty else "empty"
+        size = format_bytes(self.image_size) if not self.empty else "empty"
 
         return f"<Texture {self.uuid}, {self.time}, {size}, complete={self.complete}>"
 
@@ -89,7 +89,7 @@ class Texture(Entry):
 
     def fs_size(self) -> int:
         """Get the size of the texture file on disk in bytes"""
-        if self.is_empty:
+        if self.empty:
             return 0
 
         try:
@@ -325,7 +325,7 @@ class TextureCache:
             live: set[str] = set()
 
             for i, entry in enumerate(entries):
-                if entry.is_empty:
+                if entry.empty:
                     continue
 
                 live.add(entry.uuid)
@@ -352,7 +352,7 @@ class TextureCache:
                 if texture is not None and texture.index == i:
                     evicted.add(stale.uuid)
 
-                if not entry.is_empty:
+                if not entry.empty:
                     changed_textures[entry.uuid] = self.__texture(i, entry)
 
         evicted -= changed_textures.keys()

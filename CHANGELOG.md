@@ -5,6 +5,7 @@
 ### breaking
 
 - `texture.whole()` renamed to `texture.complete`
+- `texture.is_empty` renamed to `texture.empty`
 
 ## v0.2.0 - 2026-10-04
 

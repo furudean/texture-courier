@@ -125,7 +125,7 @@ class Entry:
         return datetime.fromtimestamp(self.__timestamp)  # noqa: DTZ006
 
     def __repr__(self) -> str:
-        size = format_bytes(self.image_size) if not self.is_empty else "empty"
+        size = format_bytes(self.image_size) if not self.empty else "empty"
         return f"<Entry {self.uuid}, {self.time}, {size}>"
 
     def __key(self) -> tuple[datetime, str, int, int]:
@@ -144,19 +144,20 @@ class Entry:
         return hash(self.__key())
 
     @property
-    def is_empty(self) -> bool:
+    def empty(self) -> bool:
+        """Whether the slot holds no texture, which the viewer marks with a size of zero or less"""
         return self.image_size <= 0
 
     @property
     def head_size(self) -> int:
-        if self.is_empty:
+        if self.empty:
             return 0
 
         return min(self.image_size, TEXTURE_CACHE_BYTE_COUNT)
 
     @property
     def cached_size(self) -> int:
-        if self.is_empty:
+        if self.empty:
             return 0
 
         return self.head_size + self.body_size
@@ -164,7 +165,7 @@ class Entry:
     @property
     def complete(self) -> bool:
         """Whether the cache claims to have the whole image downloaded"""
-        return not self.is_empty and self.image_size == self.cached_size
+        return not self.empty and self.image_size == self.cached_size
 
     @classmethod
     def from_bytes(cls, b: bytes) -> Self:

@@ -161,7 +161,7 @@ def parse_args() -> Args:
 
 
 def save_texture(texture: Texture, output_dir: Path, args: Args) -> Path:
-    if texture.is_empty:
+    if texture.empty:
         raise TextureEmptyError
 
     save_path = output_dir / f"{texture.uuid}.{'j2c' if args.raw else 'jp2'}"
@@ -188,7 +188,7 @@ def save_texture(texture: Texture, output_dir: Path, args: Args) -> Path:
 
 
 def save_thumbnail(texture: Texture, output_dir: Path, args: Args) -> Path:
-    if texture.is_empty:
+    if texture.empty:
         raise TextureEmptyError
 
     save_path = output_dir / f"{texture.uuid}.png"
