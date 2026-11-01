@@ -58,20 +58,13 @@ class Texture(Entry):
     def __repr__(self) -> str:
         size = format_bytes(self.image_size) if not self.is_empty else "empty"
 
-        return f"<Texture {self.uuid}, {self.time}, {size}, whole={self.whole()}>"
-
-    def whole(self) -> bool:
-        """Whether the cache claims to have the whole image downloaded
-
-        Only the entry's account of itself, which does not necessarily reflect the actual state on disk.
-        """
-        return self.is_complete
+        return f"<Texture {self.uuid}, {self.time}, {size}, complete={self.complete}>"
 
     def __incomplete(self) -> TextureCacheError:
         return TextureCacheError(f"{self.uuid} holds {self.cached_size} of {self.image_size} bytes")
 
     def __verify(self, head: bytes, body: bytes) -> None:
-        if not self.is_complete:
+        if not self.complete:
             raise self.__incomplete()
 
         if len(head) != self.head_size:
@@ -108,7 +101,7 @@ class Texture(Entry):
 
     def __read_codestream(self, *, verify: bool) -> tuple[bytes, bytes]:
         # sanity check before doing expensive reads
-        if verify and not self.is_complete:
+        if verify and not self.complete:
             raise self.__incomplete()
 
         # the slot is a fixed width, so trim the zero padding that follows

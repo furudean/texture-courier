@@ -64,17 +64,18 @@ cache = TextureCache("/Users/meri/Library/Caches/Firestorm_x64/texturecache")
 for tex in cache:
     print(tex)
 
-# <Texture 93ff0fc0-731a-b04e-8a66-b6489c059e04, 2026-08-21 22:39:00, 20 KB, whole=True>
-# <Texture eb2667d6-dbc8-7188-ea0e-2bc8bc8da19b, 2026-08-21 22:39:00, 39 KB, whole=True>
-# <Texture f75d9ea7-2c6f-3d11-5645-7c7c0a195721, 2026-08-21 22:38:58, 597 bytes, whole=True>
+# <Texture 93ff0fc0-731a-b04e-8a66-b6489c059e04, 2026-08-21 22:39:00, 20 KB, complete=True>
+# <Texture eb2667d6-dbc8-7188-ea0e-2bc8bc8da19b, 2026-08-21 22:39:00, 39 KB, complete=True>
+# <Texture f75d9ea7-2c6f-3d11-5645-7c7c0a195721, 2026-08-21 22:38:58, 597 bytes, complete=True>
 # ...
 
 # the api implements __getitem__, so you can interact with it like you would a list
 first_ten = cache[:10]
 
 for tex in first_ten:
-    with open(f"{tex.uuid}.jp2", "wb") as f:
-        f.write(tex.jpeg_2000())
+    if tex.complete:  # some textures are not downloaded
+        with open(f"{tex.uuid}.jp2", "wb") as f:
+            f.write(tex.jpeg_2000())
 ```
 
 ### thumbnails

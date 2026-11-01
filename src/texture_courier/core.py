@@ -162,7 +162,8 @@ class Entry:
         return self.head_size + self.body_size
 
     @property
-    def is_complete(self) -> bool:
+    def complete(self) -> bool:
+        """Whether the cache claims to have the whole image downloaded"""
         return not self.is_empty and self.image_size == self.cached_size
 
     @classmethod
@@ -176,7 +177,7 @@ class Thumbnail:
     components: int
     discard_level: int
     pixels: bytes
-    """Raw pixel rows, bottom up, as the viewer hands them to GL"""
+    """Raw pixel rows, bottom up order"""
 
     def __init__(
         self,

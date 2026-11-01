@@ -150,7 +150,7 @@ def parse_args() -> Args:
     output_format.add_argument(
         "--thumb",
         action="store_true",
-        help="dump thumbnails instead of textures. these are tiny, but exist for partial downloads.",
+        help="dump thumbnails instead of textures. these are tiny, but always exist for incomplete downloads.",
         default=False,
     )
 

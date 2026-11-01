@@ -21,7 +21,7 @@ def sample_textures() -> dict[str, Texture]:
     samples: dict[str, Texture] = {}
 
     for texture in load_cache():
-        if not texture.whole():
+        if not texture.complete:
             continue
 
         components = codestream_size(texture.codestream())[2]
@@ -38,7 +38,7 @@ def cache() -> TextureCache:
 @pytest.fixture(scope="session")
 def textures() -> list[Texture]:
     """Every texture the cache claims to hold in full"""
-    return [texture for texture in load_cache() if texture.whole()]
+    return [texture for texture in load_cache() if texture.complete]
 
 
 @pytest.fixture(scope="session")

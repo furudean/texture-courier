@@ -51,7 +51,7 @@ def thumbnails_shuffled(cache_dir: Path) -> Callable[[], Any]:
 
 
 def codestreams(cache_dir: Path) -> Callable[[], Any]:
-    textures = [texture for texture in TextureCache(cache_dir) if texture.whole()]
+    textures = [texture for texture in TextureCache(cache_dir) if texture.complete]
 
     def run() -> None:
         for texture in textures:
@@ -74,7 +74,7 @@ def jp2_wraps(cache_dir: Path) -> Callable[[], Any]:
     streams = []
 
     for texture in TextureCache(cache_dir):
-        if not texture.whole():
+        if not texture.complete:
             continue
 
         try:
