@@ -66,7 +66,7 @@ def test_every_thumbnail_encodes(thumbnails: list[tuple[Texture, Thumbnail]]) ->
 
 def test_every_thumbnail_says_what_it_was_reduced_from(thumbnails: list[tuple[Texture, Thumbnail]]) -> None:
     for texture, thumbnail in thumbnails:
-        width, height = thumbnail.source_dimensions
+        width, height = thumbnail.texture_dimensions
 
         # a discard level is a count of halvings, so the size it came from is
         # the size it is, doubled that many times and never smaller

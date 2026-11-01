@@ -152,7 +152,7 @@ class Texture(Entry):
 
         thumbnail = self.thumbnail
 
-        return None if thumbnail is None else thumbnail.source_dimensions
+        return None if thumbnail is None else thumbnail.texture_dimensions
 
 
 class TextureCache:

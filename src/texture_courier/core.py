@@ -199,10 +199,11 @@ class Thumbnail:
 
     @property
     def dimensions(self) -> tuple[int, int]:
+        """The thumbnail's own size as (width, height)"""
         return self.width, self.height
 
     @property
-    def source_dimensions(self) -> tuple[int, int]:
+    def texture_dimensions(self) -> tuple[int, int]:
         """The dimensions the cache claims for the texture this was reduced from as (width, height)"""
         return self.width << self.discard_level, self.height << self.discard_level
 

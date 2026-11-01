@@ -6,6 +6,7 @@
 
 - `texture.whole()` renamed to `texture.complete`
 - `texture.is_empty` renamed to `texture.empty`
+- `thumbnail.source_dimensions` renamed to `thumbnail.texture_dimensions`
 
 ## v0.2.0 - 2026-10-04
 
