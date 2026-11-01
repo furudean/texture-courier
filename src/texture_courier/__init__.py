@@ -1,11 +1,12 @@
 from typing import Any
 
 from .api import Texture, TextureCache
-from .core import Entry, Header, Thumbnail
+from .core import Dimensions, Entry, Header, Thumbnail
 from .error import TextureCacheError
 from .find import list_texture_caches
 
 __all__ = [
+    "Dimensions",
     "Entry",
     "Header",
     "Texture",

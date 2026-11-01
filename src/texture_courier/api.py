@@ -8,6 +8,7 @@ from typing import TypeVar, overload
 from .core import (
     ENTRY_BYTE_COUNT,
     HEADER_BYTE_COUNT,
+    Dimensions,
     Entry,
     Header,
     Thumbnail,
@@ -144,7 +145,7 @@ class Texture(Entry):
 
         return self.__cache._read_thumbnail(self)
 
-    def dimensions(self) -> tuple[int, int] | None:
+    def dimensions(self) -> Dimensions | None:
         """The dimensions the cache claims for the texture as (width, height)
 
         This reads the thumbnail into memory.

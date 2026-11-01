@@ -4,7 +4,7 @@ from datetime import datetime
 from functools import cached_property, total_ordering
 from io import BytesIO
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, NamedTuple, Self
 
 from .encode import encode_png
 from .error import TextureCacheError
@@ -172,6 +172,11 @@ class Entry:
         return cls.from_fields(*struct.unpack(ENTRY_STRUCT_FORMAT, b))
 
 
+class Dimensions(NamedTuple):
+    width: int
+    height: int
+
+
 class Thumbnail:
     width: int
     height: int
@@ -198,14 +203,14 @@ class Thumbnail:
         return f"<Thumbnail {self.width}x{self.height}, {self.components} components, discard {self.discard_level}>"
 
     @property
-    def dimensions(self) -> tuple[int, int]:
+    def dimensions(self) -> Dimensions:
         """The thumbnail's own size as (width, height)"""
-        return self.width, self.height
+        return Dimensions(self.width, self.height)
 
     @property
-    def texture_dimensions(self) -> tuple[int, int]:
+    def texture_dimensions(self) -> Dimensions:
         """The dimensions the cache claims for the texture this was reduced from as (width, height)"""
-        return self.width << self.discard_level, self.height << self.discard_level
+        return Dimensions(self.width << self.discard_level, self.height << self.discard_level)
 
     def png(self) -> bytes:
         """Encode the thumbnail as a PNG binary"""
