@@ -4,7 +4,7 @@
 
 simple CLI program and high-level python API to interact with the second life texture cache.
 
-if you're looking for a end-user tool, you may be interested in [lltexturecache-browser-qt](https://github.com/furudean/lltexturecache-browser-qt).
+if you're looking for a GUI, you may be interested in [TextureFriend](https://github.com/furudean/texturefriend)
 
 ## goals
 
