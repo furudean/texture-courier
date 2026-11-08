@@ -54,9 +54,10 @@ def prompt_for_cache_dir() -> Path:
 
     with interrupthandler(immediate=True) as h:
         while not h.interrupted:
-            selection = input("enter path or selection: ")
+            # drag and drop into a terminal can wrap the path in quotes
+            selection = input("enter path or selection: ").strip().strip("'\"")
 
-            if selection.strip() == "":
+            if selection == "":
                 continue
 
             if selection in ("q", "quit", "exit", "0"):

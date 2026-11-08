@@ -13,6 +13,10 @@
 - `Dimensions`, a named tuple of `width` and `height`, is now returned instead
   of a (width, height) pair for dimension-defining methods.
 
+### fixed
+
+- properly escape quoted path
+
 ## v0.2.0 - 2026-10-04
 
 ### changed
