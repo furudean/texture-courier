@@ -12,10 +12,19 @@
 
 - `Dimensions`, a named tuple of `width` and `height`, is now returned instead
   of a (width, height) pair for dimension-defining methods.
+- find Second Life caches on linux
+- find FirestormOS caches
+- find Alchemy caches in more locations
+- find Megapahit caches
+- find Black Dragon caches
+- find Catznip caches
 
 ### fixed
 
 - properly escape quoted path
+- `list_texture_caches()` lists a cache once when a case-insensitive filesystem
+  reaches it by two spellings
+- cli: expand `~` in a path typed at the cache prompt
 
 ## v0.2.0 - 2026-10-04
 

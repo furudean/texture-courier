@@ -72,7 +72,7 @@ def prompt_for_cache_dir() -> Path:
 
                 return caches[s - 1]
             else:
-                cache = find_texturecache(Path(selection))
+                cache = find_texturecache(Path(selection).expanduser())
 
                 if cache is None:
                     print(f"error: no texture cache found at {selection}")
